@@ -34,29 +34,24 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-6) var(--space-5);
+  padding: var(--space-6) var(--space-5) var(--space-2);
   position: relative;
 }
 
-.sidebar-brand__logo { width: 38px; height: 38px; flex-shrink: 0; }
-
-.sidebar-brand__text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
+.sidebar-brand__wordmark {
+  height: 26px;
+  width: auto;
+  flex-shrink: 0;
+  border-radius: 6px;
+  mix-blend-mode: screen;
 }
 
-.sidebar-brand__name {
-  color: #fff;
-  font-weight: 800;
-  font-size: 16px;
-  letter-spacing: -0.01em;
-}
-
-.sidebar-brand__tag {
-  color: rgba(255,255,255,0.5);
+.sidebar-tagline {
+  color: rgba(255,255,255,0.45);
   font-size: 11px;
   font-weight: 500;
+  padding: 0 var(--space-5) var(--space-5);
+  position: relative;
 }
 
 .sidebar-nav {
@@ -296,6 +291,7 @@
   .sidebar.is-open { transform: translateX(0); }
   .sidebar.is-open ~ .sidebar-overlay,
   body.sidebar-open .sidebar-overlay { display: block; }
+  .sidebar-close { display: flex; }
 
   .app-main { margin-left: 0; }
   .topbar-menu-btn { display: flex; }
@@ -311,4 +307,12 @@
   .topbar-user__meta { display: none; }
   .topbar-user { padding: 4px; }
   .icon-btn { width: 38px; height: 38px; }
+  .topbar-right { gap: var(--space-2); }
+  .topbar-right > .btn-primary {
+    min-height: 38px;
+    width: 38px;
+    padding: 0;
+    border-radius: var(--radius-sm);
+  }
+  .topbar-right > .btn-primary span { display: none; }
 }

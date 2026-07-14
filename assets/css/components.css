@@ -173,6 +173,9 @@
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-4); }
+@media (max-width: 520px) {
+  .field-row, .field-row-3 { grid-template-columns: 1fr; }
+}
 
 .field label {
   font-size: 12.5px;
@@ -213,6 +216,9 @@
 
 /* Toggle option cards (Pix / Cartão) */
 .option-toggle-group { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+@media (max-width: 420px) {
+  .option-toggle-group { grid-template-columns: 1fr; }
+}
 .option-toggle {
   display: flex;
   align-items: center;

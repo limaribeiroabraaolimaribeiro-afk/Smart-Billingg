@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Relatórios · Smart Billing</title>
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/variables.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/layout.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+<link rel="stylesheet" href="assets/css/pages.css" />
+</head>
+<body>
+
+<div id="page-content">
+  <div class="page-section">
+    <div class="section-head">
+      <div>
+        <h2 class="section-head__title">Relatórios</h2>
+        <p class="section-head__desc">Análise de desempenho financeiro do seu negócio.</p>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="report-stats" style="grid-template-columns:repeat(3,1fr);">
+      <div class="skeleton skeleton-stat"></div>
+      <div class="skeleton skeleton-stat"></div>
+      <div class="skeleton skeleton-stat"></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-header__title" style="margin-bottom:2px;">Faturamento mensal</div>
+      <div class="card-header__subtitle" style="margin-bottom:20px;">Total recebido nos últimos 6 meses</div>
+      <div id="chart-region"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:24px;align-items:start;" id="report-grid">
+      <div class="card card-pad">
+        <div class="card-header__title" style="margin-bottom:2px;">Cobranças por status</div>
+        <div class="card-header__subtitle" style="margin-bottom:20px;">Distribuição de todas as cobranças cadastradas</div>
+        <div id="status-region"></div>
+      </div>
+
+      <div class="card card-pad">
+        <div class="card-header__title" style="margin-bottom:2px;">Top clientes</div>
+        <div class="card-header__subtitle" style="margin-bottom:20px;">Ranking por total recebido</div>
+        <div id="top-clients-region"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/relatorios.js"></script>
+</body>
+</html>

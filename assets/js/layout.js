@@ -29,13 +29,10 @@ const SBLayout = (() => {
     return `
       <aside class="sidebar" id="sb-sidebar">
         <div class="sidebar-brand">
-          <img class="sidebar-brand__logo" src="assets/img/logo.svg" alt="Smart Billing" />
-          <div class="sidebar-brand__text">
-            <span class="sidebar-brand__name">Smart Billing</span>
-            <span class="sidebar-brand__tag">Cobranças &amp; Pagamentos</span>
-          </div>
-          <button class="topbar-menu-btn sidebar-close hide-desktop" id="sb-sidebar-close" aria-label="Fechar menu" style="display:none;margin-left:auto;color:rgba(255,255,255,.7)">${SB_ICON.close}</button>
+          <img class="sidebar-brand__wordmark" src="assets/img/logo.png" alt="Smart Billing" />
+          <button class="topbar-menu-btn sidebar-close" id="sb-sidebar-close" aria-label="Fechar menu" style="margin-left:auto;color:rgba(255,255,255,.7)">${SB_ICON.close}</button>
         </div>
+        <div class="sidebar-tagline">Cobranças &amp; Pagamentos</div>
         <nav class="sidebar-nav" aria-label="Navegação principal">${links}</nav>
         <div class="sidebar-footer">
           <button class="sidebar-logout" id="sb-logout-btn" type="button">
