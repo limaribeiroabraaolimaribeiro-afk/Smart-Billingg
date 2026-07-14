@@ -18,8 +18,8 @@
    ========================================================================== */
 
 window.SMART_BILLING_CONFIG = (() => {
-  const supabaseUrl = '';
-  const supabaseAnonKey = '';
+  const supabaseUrl = 'https://uhdmjgycsyvetrjhwcpy.supabase.co';
+  const supabaseAnonKey = 'sb_publishable_Ag-AwAqJWfaB7wykzwHQLQ_z4uZxwfT';
 
   const hasCredentials = Boolean(
     supabaseUrl && supabaseAnonKey && /^https:\/\/.+\.supabase\.co\/?$/.test(supabaseUrl.trim()),
