@@ -324,7 +324,11 @@ create trigger trg_charges_number before insert on public.charges
 -- security invoker (padrão) mas marcadas STABLE para performance em políticas
 -- de RLS. Usam search_path fixo para evitar sequestro de schema.
 -- ============================================================================
-create or replace function public.is_company_member(p_company_id uuid)
+-- Os parâmetros usam o prefixo "target_"/"allowed_" (em vez de "p_") e todas
+-- as colunas são referenciadas com o alias da tabela (m.company_id, m.user_id,
+-- m.role) para eliminar qualquer possibilidade de ambiguidade entre
+-- parâmetro e coluna dentro da função.
+create or replace function public.is_company_member(target_company_id uuid)
 returns boolean
 language sql
 stable
@@ -334,13 +338,13 @@ as $$
   select exists (
     select 1
     from public.company_members m
-    where m.company_id = p_company_id
+    where m.company_id = target_company_id
       and m.user_id = auth.uid()
   );
 $$;
 comment on function public.is_company_member(uuid) is 'Verifica se o usuário autenticado é membro da empresa informada.';
 
-create or replace function public.has_company_role(p_company_id uuid, p_roles public.company_role[])
+create or replace function public.has_company_role(target_company_id uuid, allowed_roles public.company_role[])
 returns boolean
 language sql
 stable
@@ -350,9 +354,9 @@ as $$
   select exists (
     select 1
     from public.company_members m
-    where m.company_id = p_company_id
+    where m.company_id = target_company_id
       and m.user_id = auth.uid()
-      and m.role = any (p_roles)
+      and m.role = any (allowed_roles)
   );
 $$;
 comment on function public.has_company_role(uuid, public.company_role[]) is 'Verifica se o usuário autenticado possui um dos papéis informados na empresa.';
@@ -611,15 +615,15 @@ grant execute on function public.register_manual_payment(uuid, public.payment_me
 create or replace view public.v_charge_status_breakdown
 with (security_invoker = true) as
 select
-  company_id,
+  public.charges.company_id,
   case
-    when status = 'pending' and due_date < current_date then 'overdue'
-    else status::text
+    when public.charges.status = 'pending' and public.charges.due_date < current_date then 'overdue'
+    else public.charges.status::text
   end as effective_status,
   count(*) as qty,
-  coalesce(sum(amount), 0) as total_amount
+  coalesce(sum(public.charges.amount), 0) as total_amount
 from public.charges
-group by company_id, 2;
+group by public.charges.company_id, 2;
 comment on view public.v_charge_status_breakdown is 'Quantidade e valor de cobranças agrupadas por status efetivo (considera atraso).';
 
 create or replace view public.v_monthly_revenue
@@ -652,10 +656,10 @@ comment on view public.v_top_clients is 'Totais recebidos/pendentes por cliente,
 
 create or replace view public.v_active_clients_count
 with (security_invoker = true) as
-select company_id, count(*) as active_clients
+select public.clients.company_id, count(*) as active_clients
 from public.clients
-where status = 'active'
-group by company_id;
+where public.clients.status = 'active'
+group by public.clients.company_id;
 comment on view public.v_active_clients_count is 'Quantidade de clientes ativos por empresa.';
 
 create or replace view public.v_dashboard_summary
@@ -699,100 +703,100 @@ grant select on public.v_dashboard_summary to authenticated;
 -- is_company_member / has_company_role, ou à própria identidade (auth.uid()).
 -- ============================================================================
 
--- ---------------- profiles ----------------
+-- ---------------- profiles (não possui company_id — usa apenas id) ----------------
 alter table public.profiles enable row level security;
 
 drop policy if exists profiles_select_own on public.profiles;
 create policy profiles_select_own on public.profiles
-  for select using (id = auth.uid());
+  for select using (public.profiles.id = auth.uid());
 
 drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_update_own on public.profiles
-  for update using (id = auth.uid()) with check (id = auth.uid());
+  for update using (public.profiles.id = auth.uid()) with check (public.profiles.id = auth.uid());
 
 drop policy if exists profiles_insert_own on public.profiles;
 create policy profiles_insert_own on public.profiles
-  for insert with check (id = auth.uid());
+  for insert with check (public.profiles.id = auth.uid());
 
--- ---------------- companies ----------------
+-- ---------------- companies (não possui company_id — a própria PK é "id") ----------------
 alter table public.companies enable row level security;
 
 drop policy if exists companies_select_members on public.companies;
 create policy companies_select_members on public.companies
-  for select using (public.is_company_member(id));
+  for select using (public.is_company_member(public.companies.id));
 
 drop policy if exists companies_insert_owner on public.companies;
 create policy companies_insert_owner on public.companies
-  for insert with check (owner_id = auth.uid());
+  for insert with check (public.companies.owner_id = auth.uid());
 
 drop policy if exists companies_update_admins on public.companies;
 create policy companies_update_admins on public.companies
-  for update using (public.has_company_role(id, array['owner', 'admin']::public.company_role[]))
-  with check (public.has_company_role(id, array['owner', 'admin']::public.company_role[]));
+  for update using (public.has_company_role(public.companies.id, array['owner', 'admin']::public.company_role[]))
+  with check (public.has_company_role(public.companies.id, array['owner', 'admin']::public.company_role[]));
 
 drop policy if exists companies_delete_owner on public.companies;
 create policy companies_delete_owner on public.companies
-  for delete using (public.has_company_role(id, array['owner']::public.company_role[]));
+  for delete using (public.has_company_role(public.companies.id, array['owner']::public.company_role[]));
 
 -- ---------------- company_members ----------------
 alter table public.company_members enable row level security;
 
 drop policy if exists company_members_select_members on public.company_members;
 create policy company_members_select_members on public.company_members
-  for select using (public.is_company_member(company_id));
+  for select using (public.is_company_member(public.company_members.company_id));
 
 drop policy if exists company_members_insert_owner on public.company_members;
 create policy company_members_insert_owner on public.company_members
-  for insert with check (public.has_company_role(company_id, array['owner']::public.company_role[]));
+  for insert with check (public.has_company_role(public.company_members.company_id, array['owner']::public.company_role[]));
 
 drop policy if exists company_members_update_owner on public.company_members;
 create policy company_members_update_owner on public.company_members
-  for update using (public.has_company_role(company_id, array['owner']::public.company_role[]))
-  with check (public.has_company_role(company_id, array['owner']::public.company_role[]));
+  for update using (public.has_company_role(public.company_members.company_id, array['owner']::public.company_role[]))
+  with check (public.has_company_role(public.company_members.company_id, array['owner']::public.company_role[]));
 
 drop policy if exists company_members_delete_owner on public.company_members;
 create policy company_members_delete_owner on public.company_members
-  for delete using (public.has_company_role(company_id, array['owner']::public.company_role[]));
+  for delete using (public.has_company_role(public.company_members.company_id, array['owner']::public.company_role[]));
 
 -- ---------------- clients ----------------
 alter table public.clients enable row level security;
 
 drop policy if exists clients_select_members on public.clients;
 create policy clients_select_members on public.clients
-  for select using (public.is_company_member(company_id));
+  for select using (public.is_company_member(public.clients.company_id));
 
 drop policy if exists clients_insert_managers on public.clients;
 create policy clients_insert_managers on public.clients
-  for insert with check (public.has_company_role(company_id, array['owner', 'admin', 'employee']::public.company_role[]));
+  for insert with check (public.has_company_role(public.clients.company_id, array['owner', 'admin', 'employee']::public.company_role[]));
 
 drop policy if exists clients_update_managers on public.clients;
 create policy clients_update_managers on public.clients
-  for update using (public.has_company_role(company_id, array['owner', 'admin', 'employee']::public.company_role[]))
-  with check (public.has_company_role(company_id, array['owner', 'admin', 'employee']::public.company_role[]));
+  for update using (public.has_company_role(public.clients.company_id, array['owner', 'admin', 'employee']::public.company_role[]))
+  with check (public.has_company_role(public.clients.company_id, array['owner', 'admin', 'employee']::public.company_role[]));
 
 drop policy if exists clients_delete_managers on public.clients;
 create policy clients_delete_managers on public.clients
-  for delete using (public.has_company_role(company_id, array['owner', 'admin', 'employee']::public.company_role[]));
+  for delete using (public.has_company_role(public.clients.company_id, array['owner', 'admin', 'employee']::public.company_role[]));
 
 -- ---------------- charges ----------------
 alter table public.charges enable row level security;
 
 drop policy if exists charges_select_members on public.charges;
 create policy charges_select_members on public.charges
-  for select using (public.is_company_member(company_id));
+  for select using (public.is_company_member(public.charges.company_id));
 
 drop policy if exists charges_insert_managers on public.charges;
 create policy charges_insert_managers on public.charges
-  for insert with check (public.has_company_role(company_id, array['owner', 'admin', 'employee']::public.company_role[]));
+  for insert with check (public.has_company_role(public.charges.company_id, array['owner', 'admin', 'employee']::public.company_role[]));
 
 drop policy if exists charges_update_managers on public.charges;
 create policy charges_update_managers on public.charges
-  for update using (public.has_company_role(company_id, array['owner', 'admin', 'employee']::public.company_role[]))
-  with check (public.has_company_role(company_id, array['owner', 'admin', 'employee']::public.company_role[]));
+  for update using (public.has_company_role(public.charges.company_id, array['owner', 'admin', 'employee']::public.company_role[]))
+  with check (public.has_company_role(public.charges.company_id, array['owner', 'admin', 'employee']::public.company_role[]));
 
 drop policy if exists charges_delete_managers on public.charges;
 create policy charges_delete_managers on public.charges
-  for delete using (public.has_company_role(company_id, array['owner', 'admin', 'employee']::public.company_role[]));
+  for delete using (public.has_company_role(public.charges.company_id, array['owner', 'admin', 'employee']::public.company_role[]));
 
 -- Não existe policy pública de SELECT em charges: o acesso da página pública
 -- é feito exclusivamente via get_public_charge_by_token (security definer).
@@ -802,16 +806,16 @@ alter table public.payments enable row level security;
 
 drop policy if exists payments_select_members on public.payments;
 create policy payments_select_members on public.payments
-  for select using (public.is_company_member(company_id));
+  for select using (public.is_company_member(public.payments.company_id));
 
 drop policy if exists payments_insert_managers on public.payments;
 create policy payments_insert_managers on public.payments
-  for insert with check (public.has_company_role(company_id, array['owner', 'admin', 'employee']::public.company_role[]));
+  for insert with check (public.has_company_role(public.payments.company_id, array['owner', 'admin', 'employee']::public.company_role[]));
 
 drop policy if exists payments_update_managers on public.payments;
 create policy payments_update_managers on public.payments
-  for update using (public.has_company_role(company_id, array['owner', 'admin']::public.company_role[]))
-  with check (public.has_company_role(company_id, array['owner', 'admin']::public.company_role[]));
+  for update using (public.has_company_role(public.payments.company_id, array['owner', 'admin']::public.company_role[]))
+  with check (public.has_company_role(public.payments.company_id, array['owner', 'admin']::public.company_role[]));
 
 -- Sem policy de DELETE: registros financeiros são imutáveis via frontend.
 
@@ -820,11 +824,11 @@ alter table public.receipts enable row level security;
 
 drop policy if exists receipts_select_members on public.receipts;
 create policy receipts_select_members on public.receipts
-  for select using (public.is_company_member(company_id));
+  for select using (public.is_company_member(public.receipts.company_id));
 
 drop policy if exists receipts_insert_managers on public.receipts;
 create policy receipts_insert_managers on public.receipts
-  for insert with check (public.has_company_role(company_id, array['owner', 'admin', 'employee']::public.company_role[]));
+  for insert with check (public.has_company_role(public.receipts.company_id, array['owner', 'admin', 'employee']::public.company_role[]));
 
 -- Sem policy de UPDATE/DELETE: recibos são imutáveis via frontend.
 -- Acesso público de um recibo específico é via get_public_receipt_by_token.
@@ -834,11 +838,11 @@ alter table public.notification_logs enable row level security;
 
 drop policy if exists notification_logs_select_members on public.notification_logs;
 create policy notification_logs_select_members on public.notification_logs
-  for select using (public.is_company_member(company_id));
+  for select using (public.is_company_member(public.notification_logs.company_id));
 
 drop policy if exists notification_logs_insert_managers on public.notification_logs;
 create policy notification_logs_insert_managers on public.notification_logs
-  for insert with check (public.has_company_role(company_id, array['owner', 'admin', 'employee']::public.company_role[]));
+  for insert with check (public.has_company_role(public.notification_logs.company_id, array['owner', 'admin', 'employee']::public.company_role[]));
 
 -- ---------------- webhook_events ----------------
 -- RLS habilitado e SEM NENHUMA policy: nem anon, nem authenticated conseguem
