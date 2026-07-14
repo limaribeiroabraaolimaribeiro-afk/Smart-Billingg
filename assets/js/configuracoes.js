@@ -3,6 +3,9 @@
    ========================================================================== */
 
 (async function initConfiguracoes() {
+  const session = await SB_AUTH.requireSession();
+  if (!session) return;
+
   await SBLayout.mount({
     active: 'configuracoes',
     title: 'Configurações',
@@ -32,7 +35,7 @@
         <div class="card-header__subtitle" style="margin-bottom:20px;">Suas informações pessoais de acesso</div>
         <div class="field-row">
           ${fieldRow('Nome completo', empresa.admin.nome).replace('<input', '<input id="perfil-nome"')}
-          ${fieldRow('Cargo', empresa.admin.cargo).replace('<input', '<input id="perfil-cargo"')}
+          ${fieldRow('Cargo', empresa.admin.cargo).replace('<input', `<input id="perfil-cargo" ${window.SMART_BILLING_CONFIG?.useDemoMode ? '' : 'disabled title="O cargo é definido pela sua função na empresa e não pode ser editado aqui."'}`)}
         </div>
         <div class="field" style="margin-top:16px;">
           <label>E-mail de acesso</label>
@@ -143,6 +146,67 @@
       </div>`;
   }
 
+  function sectionDados() {
+    const isDemo = Boolean(window.SMART_BILLING_CONFIG?.useDemoMode);
+    const snapshot = DB._readLocalDemoSnapshot?.();
+    const qtdClientes = snapshot?.clientes?.length || 0;
+    const qtdCobrancas = snapshot?.cobrancas?.length || 0;
+    const jaMigrado = localStorage.getItem('smart_billing_migration_done_v1');
+
+    if (isDemo) {
+      return `
+        <div class="card card-pad">
+          <div class="card-header__title" style="margin-bottom:4px;">Migração de dados</div>
+          <div class="card-header__subtitle" style="margin-bottom:16px;">Disponível somente quando o Supabase estiver configurado</div>
+          <div class="auth-banner">
+            ${SB_ICON.alertTriangle}
+            <span>O sistema está em <strong>modo de demonstração</strong>. Configure o Supabase (veja SUPABASE_SETUP.md) para habilitar a migração dos dados simulados para o banco real.</span>
+          </div>
+        </div>`;
+    }
+
+    if (qtdClientes === 0 && qtdCobrancas === 0) {
+      return `
+        <div class="card card-pad">
+          <div class="card-header__title" style="margin-bottom:4px;">Migração de dados</div>
+          <div class="card-header__subtitle" style="margin-bottom:16px;">Transferir dados simulados (localStorage) para o Supabase</div>
+          <div class="state-block">
+            <div class="state-block__icon">${SB_ICON.inbox}</div>
+            <div class="state-block__title">Nenhum dado local encontrado</div>
+            <p class="state-block__desc">Não há clientes ou cobranças de demonstração salvos neste navegador para migrar.</p>
+          </div>
+        </div>`;
+    }
+
+    return `
+      <div class="card card-pad">
+        <div class="card-header__title" style="margin-bottom:4px;">Migração de dados</div>
+        <div class="card-header__subtitle" style="margin-bottom:16px;">Transferir os dados simulados deste navegador (localStorage) para o Supabase</div>
+
+        ${jaMigrado ? `
+          <div class="auth-banner">
+            ${SB_ICON.alertTriangle}
+            <span>Uma migração já foi realizada neste navegador em <strong>${SB_UI.formatDateTime(jaMigrado)}</strong>. Rodar novamente pode duplicar registros.</span>
+          </div>` : ''}
+
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+          <div class="summary-row"><span class="label">Clientes encontrados</span><span class="value">${qtdClientes}</span></div>
+          <div class="summary-row"><span class="label">Cobranças encontradas</span><span class="value">${qtdCobrancas}</span></div>
+        </div>
+
+        <p class="field-hint" style="margin-bottom:16px;">
+          Os clientes serão criados primeiro; em seguida as cobranças serão recriadas já vinculadas ao cliente correto.
+          Cobranças que estavam pagas geram automaticamente um pagamento e um recibo (com data/hora da migração).
+          Os dados locais NÃO são apagados — permanecem como backup neste navegador.
+        </p>
+
+        <button class="btn btn-primary" id="btn-start-migration">
+          ${SB_ICON.package}<span>${jaMigrado ? 'Migrar novamente mesmo assim' : 'Iniciar migração'}</span>
+        </button>
+        <div id="migration-result" style="margin-top:16px;"></div>
+      </div>`;
+  }
+
   function errorBlock() {
     return `
       <div class="card card-pad">
@@ -160,7 +224,91 @@
     integracoes: sectionIntegracoes,
     notificacoes: sectionNotificacoes,
     seguranca: sectionSeguranca,
+    dados: sectionDados,
   };
+
+  async function runMigration() {
+    const snapshot = DB._readLocalDemoSnapshot();
+    const resultEl = document.getElementById('migration-result');
+    const btn = document.getElementById('btn-start-migration');
+
+    const ok = await SB_UI.confirmDialog({
+      title: 'Iniciar migração de dados',
+      desc: `Isso vai criar ${snapshot.clientes.length} cliente(s) e ${snapshot.cobrancas.length} cobrança(s) no Supabase, vinculados à sua empresa atual. Deseja continuar?`,
+      confirmLabel: 'Migrar agora',
+      tone: 'warn',
+    });
+    if (!ok) return;
+
+    btn.disabled = true;
+    btn.querySelector('span').textContent = 'Migrando...';
+
+    const idMap = {};
+    let clientesOk = 0;
+    let cobrancasOk = 0;
+    let cobrancasPagas = 0;
+    let cobrancasCanceladas = 0;
+    const erros = [];
+
+    for (const cli of snapshot.clientes) {
+      try {
+        const novo = await DB.clientes.create({ nome: cli.nome, whatsapp: cli.whatsapp, email: cli.email });
+        idMap[cli.id] = novo.id;
+        clientesOk += 1;
+      } catch (err) {
+        erros.push(`Cliente "${cli.nome}": ${err.message}`);
+      }
+    }
+
+    for (const cob of snapshot.cobrancas) {
+      const novoClienteId = idMap[cob.clienteId];
+      if (!novoClienteId) {
+        erros.push(`Cobrança "${cob.descricao}" ignorada (cliente original não encontrado).`);
+        continue;
+      }
+      try {
+        const nova = await DB.cobrancas.create({
+          clienteId: novoClienteId,
+          descricao: cob.descricao,
+          valor: cob.valor,
+          vencimento: cob.vencimento,
+          formaPagamento: cob.formaPagamento,
+          parcelas: cob.parcelas,
+          observacoes: cob.observacoes || '',
+          enviarWhatsapp: false,
+          enviarEmail: false,
+        });
+        cobrancasOk += 1;
+
+        if (cob.status === 'pago') {
+          await DB.cobrancas.markPaid(nova.id, { forma: cob.formaPagamento === 'ambos' ? 'pix' : cob.formaPagamento, parcelas: cob.parcelas });
+          cobrancasPagas += 1;
+        } else if (cob.status === 'cancelado') {
+          await DB.cobrancas.cancel(nova.id);
+          cobrancasCanceladas += 1;
+        }
+      } catch (err) {
+        erros.push(`Cobrança "${cob.descricao}": ${err.message}`);
+      }
+    }
+
+    localStorage.setItem('smart_billing_migration_done_v1', new Date().toISOString());
+
+    resultEl.innerHTML = `
+      <div class="auth-banner" style="background:var(--green-100);border-color:rgba(16,185,129,.3);">
+        ${SB_ICON.checkCircle}
+        <span>
+          Migração concluída: <strong>${clientesOk}</strong> cliente(s) e <strong>${cobrancasOk}</strong> cobrança(s) criados
+          (${cobrancasPagas} marcada(s) como paga, ${cobrancasCanceladas} cancelada(s)).
+          ${erros.length ? `${erros.length} item(ns) com erro — veja abaixo.` : ''}
+        </span>
+      </div>
+      ${erros.length ? `<ul style="margin-top:10px;padding-left:18px;font-size:12px;color:var(--red-600,#dc2626);">${erros.map((e) => `<li>${SB_UI.escapeHtml(e)}</li>`).join('')}</ul>` : ''}
+    `;
+    btn.disabled = false;
+    btn.querySelector('span').textContent = 'Migrar novamente mesmo assim';
+    SB_UI.toast({ type: 'success', title: 'Migração concluída', desc: `${clientesOk} clientes, ${cobrancasOk} cobranças.` });
+  }
 
   function wireSection(name) {
     if (name === 'perfil') {
@@ -201,8 +349,17 @@
       });
     }
     if (name === 'seguranca') {
-      document.getElementById('btn-change-pass')?.addEventListener('click', () => {
-        SB_UI.toast({ type: 'info', title: 'Indisponível no modo demonstração', desc: 'Conecte a autenticação do Supabase para habilitar esta ação.' });
+      document.getElementById('btn-change-pass')?.addEventListener('click', async () => {
+        if (window.SMART_BILLING_CONFIG?.useDemoMode) {
+          SB_UI.toast({ type: 'info', title: 'Indisponível no modo demonstração', desc: 'Conecte a autenticação do Supabase para habilitar esta ação.' });
+          return;
+        }
+        try {
+          await SB_AUTH.resetPassword(empresa.admin.email);
+          SB_UI.toast({ type: 'success', title: 'E-mail enviado', desc: `Link para redefinir a senha enviado para ${empresa.admin.email}.` });
+        } catch (err) {
+          SB_UI.toast({ type: 'error', title: 'Não foi possível enviar o e-mail', desc: err.message });
+        }
       });
       document.getElementById('btn-logout-all')?.addEventListener('click', async () => {
         const ok = await SB_UI.confirmDialog({
@@ -212,10 +369,15 @@
           tone: 'danger',
         });
         if (ok) {
+          await SB_AUTH?.signOut();
           SB_UI.toast({ type: 'info', title: 'Sessões encerradas' });
-          setTimeout(() => { window.location.href = 'index.html'; }, 600);
+          const dest = window.SMART_BILLING_CONFIG?.useDemoMode ? 'index.html' : 'login.html';
+          setTimeout(() => { window.location.href = dest; }, 600);
         }
       });
+    }
+    if (name === 'dados') {
+      document.getElementById('btn-start-migration')?.addEventListener('click', runMigration);
     }
   }
 

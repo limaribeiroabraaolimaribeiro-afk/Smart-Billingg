@@ -1,10 +1,15 @@
 /* ==========================================================================
    Smart Billing — Página pública da cobrança
+   --------------------------------------------------------------------------
+   Acessível sem login, via ?token=<public_token>. Não expõe IDs internos
+   nem dados privados da empresa. Enquanto a cobrança não tiver checkout_url
+   configurado, o botão "Pagar agora" apenas informa que o checkout ainda
+   não foi configurado — nenhum pagamento é simulado/aprovado aqui.
    ========================================================================== */
 
 (async function initPublicCharge() {
   const params = new URLSearchParams(window.location.search);
-  const id = params.get('id');
+  const token = params.get('token') || params.get('id');
   const region = document.getElementById('public-region');
 
   function shell(inner) {
@@ -22,12 +27,11 @@
       </div>`);
   }
 
-  if (!id) { errorState('Cobrança não encontrada', 'O link acessado é inválido ou está incompleto.'); return; }
+  if (!token) { errorState('Cobrança não encontrada', 'O link acessado é inválido ou está incompleto.'); return; }
 
   let cobranca;
-  let empresa;
   try {
-    [cobranca, empresa] = await Promise.all([DB.cobrancas.get(id), DB.empresa.get()]);
+    cobranca = await DB.cobrancas.getByPublicToken(token);
   } catch (err) {
     errorState('Erro ao carregar cobrança', 'Não foi possível buscar os dados. Tente novamente em instantes.');
     return;
@@ -35,6 +39,7 @@
 
   if (!cobranca) { errorState('Cobrança não encontrada', 'O link acessado é inválido ou a cobrança foi removida.'); return; }
 
+  const empresaNome = cobranca.empresaNome || 'Smart Billing';
   document.title = `Cobrança ${cobranca.codigo} · Smart Billing`;
 
   const clienteNome = cobranca.cliente?.nome || 'Cliente';
@@ -45,7 +50,7 @@
       <div class="public-card__hero">
         <span class="badge ${statusMeta.cls} public-status-pill" style="background:rgba(255,255,255,.2);color:#fff;">${statusMeta.label}</span>
         <img class="public-card__logo" src="assets/img/logo.svg" alt="Smart Billing" />
-        <div class="public-card__company">${SB_UI.escapeHtml(empresa.nome)}</div>
+        <div class="public-card__company">${SB_UI.escapeHtml(empresaNome)}</div>
         <div class="public-card__client">Cobrança para ${SB_UI.escapeHtml(clienteNome)}</div>
         <div class="public-card__amount-label">Valor a pagar</div>
         <div class="public-card__amount">${SB_UI.formatCurrency(cobranca.valor)}</div>
@@ -69,7 +74,7 @@
         </div>
         <div class="public-info-row">
           <span class="label">${SB_ICON.building}Empresa</span>
-          <span class="value">${SB_UI.escapeHtml(empresa.nome)}</span>
+          <span class="value">${SB_UI.escapeHtml(empresaNome)}</span>
         </div>
       </div>`;
   }
@@ -81,7 +86,11 @@
       </div>`;
   }
 
-  // ---- Already paid / canceled states ----
+  function appendFooter() {
+    document.getElementById('public-region').insertAdjacentHTML('beforeend', `<div style="text-align:center;">${footerLogo()}</div>`);
+  }
+
+  // ---- Already paid ----
   if (cobranca.status === 'pago') {
     region.innerHTML = shell(`
       ${heroBlock()}
@@ -91,13 +100,13 @@
           <div class="state-block__icon" style="background:var(--green-100);color:var(--green-700);">${SB_ICON.checkCircle}</div>
           <div class="state-block__title">Esta cobrança já foi paga</div>
           <p class="state-block__desc">Pagamento confirmado em ${SB_UI.formatDate(cobranca.pagoEm)}.</p>
-          <a class="btn btn-primary btn-block" href="pagamento-confirmado.html?id=${cobranca.id}">Ver comprovante</a>
         </div>
       </div>`);
-    document.getElementById('public-region').insertAdjacentHTML('beforeend', `<div style="text-align:center;">${footerLogo()}</div>`);
+    appendFooter();
     return;
   }
 
+  // ---- Cancelled ----
   if (cobranca.status === 'cancelado') {
     region.innerHTML = shell(`
       ${heroBlock()}
@@ -106,21 +115,31 @@
         <div class="state-block is-error" style="padding-top:24px;">
           <div class="state-block__icon">${SB_ICON.ban}</div>
           <div class="state-block__title">Cobrança cancelada</div>
-          <p class="state-block__desc">Esta cobrança não está mais disponível para pagamento. Entre em contato com ${SB_UI.escapeHtml(empresa.nome)} caso tenha dúvidas.</p>
+          <p class="state-block__desc">Esta cobrança não está mais disponível para pagamento. Entre em contato com ${SB_UI.escapeHtml(empresaNome)} caso tenha dúvidas.</p>
         </div>
       </div>`);
+    appendFooter();
     return;
   }
 
-  // ---- Payable state ----
+  // ---- Overdue notice (still payable, just flagged) ----
+  const overdueNotice = cobranca.status === 'atrasado' ? `
+    <div class="auth-alert" style="margin-top:16px;">
+      ${SB_ICON.alertTriangle}
+      <span>Esta cobrança está vencida desde ${SB_UI.formatDate(cobranca.vencimento)}. Regularize o quanto antes.</span>
+    </div>` : '';
+
+  // ---- Payable state (pendente / atrasado) ----
   const acceptsPix = cobranca.formaPagamento === 'pix' || cobranca.formaPagamento === 'ambos';
   const acceptsCartao = cobranca.formaPagamento === 'cartao' || cobranca.formaPagamento === 'ambos';
   const defaultMethod = acceptsPix ? 'pix' : 'cartao';
+  const hasCheckout = Boolean(cobranca.checkoutUrl);
 
   region.innerHTML = shell(`
     ${heroBlock()}
     <div class="public-card__body">
       ${infoPanel()}
+      ${overdueNotice}
 
       <div class="public-section-title">Forma de pagamento</div>
       <div class="pay-method-grid">
@@ -155,8 +174,8 @@
         <span>Ambiente seguro · Pagamento criptografado</span>
       </div>
     </div>
-  `));
-  document.getElementById('public-region').insertAdjacentHTML('beforeend', `<div style="text-align:center;">${footerLogo()}</div>`);
+  `);
+  appendFooter();
 
   document.querySelectorAll('input[name="method"]').forEach((radio) => {
     radio.addEventListener('change', () => {
@@ -184,21 +203,18 @@
     }
   }
 
-  document.getElementById('pay-btn').addEventListener('click', async () => {
-    const btn = document.getElementById('pay-btn');
-    btn.disabled = true;
-    document.getElementById('pay-btn-label').textContent = 'Processando pagamento...';
-    const forma = selectedMethod();
-    const parcelas = forma === 'cartao' ? Number(document.getElementById('parcelas-select')?.value || 1) : 1;
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1400));
-      const result = await DB.cobrancas.markPaid(cobranca.id, { forma, parcelas });
-      window.location.href = `pagamento-confirmado.html?id=${cobranca.id}&pagamento=${result.pagamento.id}`;
-    } catch (err) {
-      SB_UI.toast({ type: 'error', title: 'Não foi possível processar o pagamento', desc: 'Tente novamente em instantes.' });
-      btn.disabled = false;
-      updatePayLabel();
+  document.getElementById('pay-btn').addEventListener('click', () => {
+    if (!hasCheckout) {
+      SB_UI.toast({
+        type: 'info',
+        title: 'Checkout ainda não configurado',
+        desc: 'O checkout ainda não foi configurado para esta cobrança.',
+        duration: 5000,
+      });
+      return;
     }
+    // Quando checkout_url existir (integração futura com a InfinitePay),
+    // o cliente é redirecionado para o checkout real do provedor.
+    window.location.href = cobranca.checkoutUrl;
   });
 })();

@@ -3,6 +3,9 @@
    ========================================================================== */
 
 (async function initCobrancaForm() {
+  const session = await SB_AUTH.requireSession();
+  if (!session) return;
+
   const params = new URLSearchParams(window.location.search);
   const editId = params.get('id');
   const preselectClienteId = params.get('clienteId');

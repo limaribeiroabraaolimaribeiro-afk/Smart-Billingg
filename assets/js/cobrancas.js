@@ -3,6 +3,9 @@
    ========================================================================== */
 
 (async function initCobrancas() {
+  const session = await SB_AUTH.requireSession();
+  if (!session) return;
+
   await SBLayout.mount({
     active: 'cobrancas',
     title: 'Cobranças',

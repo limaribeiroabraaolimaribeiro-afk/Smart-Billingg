@@ -3,6 +3,9 @@
    ========================================================================== */
 
 (async function initRelatorios() {
+  const session = await SB_AUTH.requireSession();
+  if (!session) return;
+
   await SBLayout.mount({
     active: 'relatorios',
     title: 'Relatórios',

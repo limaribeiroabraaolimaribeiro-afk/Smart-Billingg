@@ -5,7 +5,8 @@
 
 const SB_ACTIONS = (() => {
   function publicUrl(cobranca) {
-    return `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}cobranca-publica.html?id=${cobranca.id}`;
+    const base = `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
+    return `${base}cobranca-publica.html?token=${cobranca.publicToken || cobranca.id}`;
   }
 
   function rowMenuHtml(cobranca) {
@@ -28,7 +29,7 @@ const SB_ACTIONS = (() => {
     if (!cobranca) return;
 
     if (act === 'view') {
-      window.open(`cobranca-publica.html?id=${cobranca.id}`, '_blank');
+      window.open(publicUrl(cobranca), '_blank');
       return;
     }
     if (act === 'whatsapp') {

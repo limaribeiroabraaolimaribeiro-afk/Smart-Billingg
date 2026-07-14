@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Entrar · Smart Billing</title>
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/variables.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+<link rel="stylesheet" href="assets/css/pages.css" />
+</head>
+<body>
+
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo"><img src="assets/img/logo.png" alt="Smart Billing" /></div>
+
+    <div id="demo-banner-slot"></div>
+
+    <div id="auth-forms">
+      <div class="auth-title">Acesse sua conta</div>
+      <p class="auth-subtitle">Gerencie suas cobranças, clientes e pagamentos.</p>
+
+      <div class="auth-tabs" id="auth-tabs">
+        <button class="auth-tab is-active" data-tab="login">Entrar</button>
+        <button class="auth-tab" data-tab="signup">Criar conta</button>
+        <button class="auth-tab" data-tab="forgot">Esqueci a senha</button>
+      </div>
+
+      <div id="auth-alert-slot"></div>
+
+      <!-- Login -->
+      <form class="auth-panel is-active" id="panel-login" data-panel="login">
+        <div class="field">
+          <label for="login-email">E-mail</label>
+          <input class="input" id="login-email" type="email" autocomplete="email" placeholder="voce@empresa.com" required />
+        </div>
+        <div class="field">
+          <label for="login-password">Senha</label>
+          <div class="password-field">
+            <input class="input" id="login-password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+            <button type="button" class="password-toggle" data-toggle-for="login-password" aria-label="Mostrar senha">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="auth-forgot"><button type="button" class="auth-forgot" data-goto="forgot" style="background:none;">Esqueceu a senha?</button></div>
+        <button type="submit" class="btn btn-primary btn-block" id="login-submit">
+          <span>Entrar</span>
+        </button>
+      </form>
+
+      <!-- Cadastro -->
+      <form class="auth-panel" id="panel-signup" data-panel="signup">
+        <div class="field">
+          <label for="signup-name">Nome completo</label>
+          <input class="input" id="signup-name" placeholder="Seu nome" autocomplete="name" required />
+        </div>
+        <div class="field">
+          <label for="signup-company">Nome da empresa</label>
+          <input class="input" id="signup-company" placeholder="Ex: Minha Empresa Ltda" autocomplete="organization" required />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="signup-phone">Telefone / WhatsApp</label>
+            <input class="input" id="signup-phone" placeholder="(11) 91234-5678" inputmode="tel" autocomplete="tel" />
+          </div>
+          <div class="field">
+            <label for="signup-email">E-mail</label>
+            <input class="input" id="signup-email" type="email" placeholder="voce@empresa.com" autocomplete="email" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="signup-password">Senha</label>
+          <div class="password-field">
+            <input class="input" id="signup-password" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" minlength="6" required />
+            <button type="button" class="password-toggle" data-toggle-for="signup-password" aria-label="Mostrar senha">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="signup-submit">
+          <span>Criar conta</span>
+        </button>
+      </form>
+
+      <!-- Esqueci a senha -->
+      <form class="auth-panel" id="panel-forgot" data-panel="forgot">
+        <p class="field-hint">Informe seu e-mail de cadastro. Enviaremos um link para redefinir sua senha.</p>
+        <div class="field">
+          <label for="forgot-email">E-mail</label>
+          <input class="input" id="forgot-email" type="email" placeholder="voce@empresa.com" autocomplete="email" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="forgot-submit">
+          <span>Enviar link de redefinição</span>
+        </button>
+      </form>
+    </div>
+
+    <p class="auth-footer">Smart Billing · Ambiente seguro e criptografado</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/supabase-client.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/login.js"></script>
+</body>
+</html>

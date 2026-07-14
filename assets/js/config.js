@@ -1,25 +1,45 @@
 /* ==========================================================================
    Smart Billing — Integration configuration
    --------------------------------------------------------------------------
-   Nenhuma chave ou segredo deve ser gravado neste arquivo.
-   Em produção, estes valores devem vir de variáveis de ambiente injetadas
-   no build (ex.: import.meta.env / process.env) ou de um endpoint de
-   configuração servido pelo backend — nunca hardcoded no repositório.
+   Nenhuma chave SECRETA deve ser gravada neste arquivo. A "anon key" do
+   Supabase é uma chave PÚBLICA (protegida por RLS) e pode ficar no
+   front-end normalmente — mas a "service_role key" NUNCA pode aparecer
+   aqui nem em nenhum arquivo servido ao navegador.
+
+   Como configurar:
+   1. Crie um projeto em https://supabase.com
+   2. Rode sql/supabase_schema.sql inteiro no SQL Editor do projeto
+   3. Em Project Settings → API, copie:
+        - "Project URL"        → cole em supabaseUrl abaixo
+        - "anon" / "publishable" key → cole em supabaseAnonKey abaixo
+   4. Salve o arquivo. O sistema passa a usar o banco real automaticamente.
+
+   Veja o passo a passo completo em SUPABASE_SETUP.md.
    ========================================================================== */
 
-window.SMART_BILLING_CONFIG = {
-  supabase: {
-    // Preenchido em runtime via variável de ambiente (ex.: SUPABASE_URL).
-    url: window.__ENV__?.SUPABASE_URL || '',
-    anonKey: window.__ENV__?.SUPABASE_ANON_KEY || '',
-  },
-  infinitePay: {
-    // Preenchido em runtime via variável de ambiente (ex.: INFINITEPAY_CLIENT_ID).
-    clientId: window.__ENV__?.INFINITEPAY_CLIENT_ID || '',
-    // Chamadas autenticadas devem passar por uma function/serverless própria;
-    // o client-id público apenas identifica o checkout, nunca a chave secreta.
-  },
-  // Enquanto as credenciais acima não são configuradas, o app roda em modo
-  // demo com dados simulados persistidos em localStorage (ver data.js).
-  demoMode: true,
-};
+window.SMART_BILLING_CONFIG = (() => {
+  const supabaseUrl = '';
+  const supabaseAnonKey = '';
+
+  const hasCredentials = Boolean(
+    supabaseUrl && supabaseAnonKey && /^https:\/\/.+\.supabase\.co\/?$/.test(supabaseUrl.trim()),
+  );
+
+  return {
+    supabaseUrl,
+    supabaseAnonKey,
+    environment: 'development',
+
+    infinitePay: {
+      // Preenchido futuramente com o Client ID público do checkout.
+      // A chave secreta da InfinitePay NUNCA deve ficar no frontend —
+      // veja supabase/functions/ para onde ela deve morar.
+      clientId: '',
+    },
+
+    // true automaticamente enquanto supabaseUrl/supabaseAnonKey não forem
+    // preenchidos acima. Com o Supabase configurado, o app passa a usar
+    // somente dados reais — os dados de demonstração deixam de aparecer.
+    useDemoMode: !hasCredentials,
+  };
+})();

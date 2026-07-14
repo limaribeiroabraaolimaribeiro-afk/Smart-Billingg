@@ -3,6 +3,9 @@
    ========================================================================== */
 
 (async function initClienteForm() {
+  const session = await SB_AUTH.requireSession();
+  if (!session) return;
+
   const params = new URLSearchParams(window.location.search);
   const editId = params.get('id');
   const isEdit = Boolean(editId);

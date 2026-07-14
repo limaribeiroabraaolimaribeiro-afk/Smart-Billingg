@@ -3,6 +3,9 @@
    ========================================================================== */
 
 (async function initClientes() {
+  const session = await SB_AUTH.requireSession();
+  if (!session) return;
+
   await SBLayout.mount({
     active: 'clientes',
     title: 'Clientes',

@@ -97,6 +97,15 @@ const SBLayout = (() => {
       </header>`;
   }
 
+  function demoBannerHtml() {
+    if (!window.SMART_BILLING_CONFIG?.useDemoMode) return '';
+    return `
+      <div class="demo-banner">
+        ${SB_ICON.alertTriangle}
+        <span>Modo de demonstração — os dados exibidos são simulados e não usam o Supabase. <a href="configuracoes.html">Configure a integração</a> para usar dados reais.</span>
+      </div>`;
+  }
+
   async function mount(opts = {}) {
     const contentHost = document.getElementById('page-content');
     const shell = document.createElement('div');
@@ -105,6 +114,7 @@ const SBLayout = (() => {
       ${sidebarHtml(opts.active)}
       <div class="app-main">
         ${topbarHtml(opts)}
+        ${demoBannerHtml()}
         <main class="app-content" id="sb-app-content"></main>
       </div>`;
 
@@ -147,8 +157,10 @@ const SBLayout = (() => {
         tone: 'danger',
       });
       if (ok) {
+        await SB_AUTH?.signOut();
         SB_UI.toast({ type: 'info', title: 'Sessão encerrada', desc: 'Até logo!' });
-        setTimeout(() => { window.location.href = 'index.html'; }, 600);
+        const dest = window.SMART_BILLING_CONFIG?.useDemoMode ? 'index.html' : 'login.html';
+        setTimeout(() => { window.location.href = dest; }, 600);
       }
     };
     document.getElementById('sb-logout-btn')?.addEventListener('click', doLogout);

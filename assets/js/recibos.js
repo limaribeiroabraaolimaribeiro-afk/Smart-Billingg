@@ -3,6 +3,9 @@
    ========================================================================== */
 
 (async function initRecibos() {
+  const session = await SB_AUTH.requireSession();
+  if (!session) return;
+
   await SBLayout.mount({
     active: 'recibos',
     title: 'Recibos',
@@ -28,7 +31,7 @@
   }
 
   function receiptUrl(r) {
-    return `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}pagamento-confirmado.html?id=${r.cobrancaId}`;
+    return `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}pagamento-confirmado.html?token=${r.publicToken || r.id}`;
   }
 
   function menuHtml(r) {

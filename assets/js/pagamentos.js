@@ -3,6 +3,9 @@
    ========================================================================== */
 
 (async function initPagamentos() {
+  const session = await SB_AUTH.requireSession();
+  if (!session) return;
+
   await SBLayout.mount({
     active: 'pagamentos',
     title: 'Pagamentos',

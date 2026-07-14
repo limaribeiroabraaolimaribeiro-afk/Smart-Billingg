@@ -3,6 +3,9 @@
    ========================================================================== */
 
 (async function initClienteHistorico() {
+  const session = await SB_AUTH.requireSession();
+  if (!session) return;
+
   const params = new URLSearchParams(window.location.search);
   const clienteId = params.get('id');
 

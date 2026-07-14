@@ -3,6 +3,9 @@
    ========================================================================== */
 
 (async function initDashboard() {
+  const session = await SB_AUTH.requireSession();
+  if (!session) return;
+
   await SBLayout.mount({
     active: 'dashboard',
     title: 'Dashboard',
