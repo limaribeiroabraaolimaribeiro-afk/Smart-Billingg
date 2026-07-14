@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Novo cliente · Smart Billing</title>
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/variables.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/layout.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+<link rel="stylesheet" href="assets/css/pages.css" />
+</head>
+<body>
+
+<div id="page-content">
+  <div class="page-section" style="max-width:640px;">
+    <a href="clientes.html" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7M5 12h14"/></svg>
+      <span>Voltar para clientes</span>
+    </a>
+
+    <form id="cliente-form" class="card card-pad">
+      <div class="card-header__title" id="form-title" style="margin-bottom:4px;">Novo cliente</div>
+      <div class="card-header__subtitle" style="margin-bottom:20px;">Preencha os dados abaixo para cadastrar o cliente</div>
+
+      <div class="field">
+        <label for="nome">Nome completo</label>
+        <input class="input" id="nome" placeholder="Ex: Maria da Silva" />
+      </div>
+
+      <div class="field-row" style="margin-top:16px;">
+        <div class="field">
+          <label for="whatsapp">WhatsApp</label>
+          <input class="input" id="whatsapp" placeholder="(11) 91234-5678" inputmode="tel" />
+        </div>
+        <div class="field">
+          <label for="email">E-mail <span class="optional">(opcional)</span></label>
+          <input class="input" id="email" type="email" placeholder="cliente@email.com" />
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:28px;">
+        <a href="clientes.html" class="btn btn-secondary btn-block">Cancelar</a>
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
+          <span id="submit-btn-label">Cadastrar cliente</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/cliente-form.js"></script>
+</body>
+</html>

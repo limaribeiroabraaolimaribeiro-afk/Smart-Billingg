@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Nova cobrança · Smart Billing</title>
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/variables.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/layout.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+<link rel="stylesheet" href="assets/css/pages.css" />
+</head>
+<body>
+
+<div id="page-content">
+  <div class="page-section">
+    <a href="cobrancas.html" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7M5 12h14"/></svg>
+      <span>Voltar para cobranças</span>
+    </a>
+
+    <form id="cobranca-form" class="form-layout" novalidate>
+      <div class="form-steps">
+
+        <div class="card card-pad">
+          <div class="section-head" style="margin-bottom:20px;">
+            <div>
+              <div class="card-header__title">Cliente</div>
+              <div class="card-header__subtitle">Selecione um cliente existente ou cadastre um novo</div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" id="toggle-new-client">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              <span id="toggle-new-client-label">Cadastrar novo cliente</span>
+            </button>
+          </div>
+
+          <div id="existing-client-block" class="field">
+            <label for="cliente-select">Cliente</label>
+            <select class="select" id="cliente-select">
+              <option value="">Selecione um cliente...</option>
+            </select>
+          </div>
+
+          <div id="new-client-block" style="display:none;">
+            <div class="field-row">
+              <div class="field">
+                <label for="novo-nome">Nome do cliente</label>
+                <input class="input" id="novo-nome" placeholder="Ex: Maria da Silva" />
+              </div>
+              <div class="field">
+                <label for="novo-whatsapp">WhatsApp</label>
+                <input class="input" id="novo-whatsapp" placeholder="(11) 91234-5678" inputmode="tel" />
+              </div>
+            </div>
+            <div class="field" style="margin-top:16px;">
+              <label for="novo-email">E-mail <span class="optional">(opcional)</span></label>
+              <input class="input" id="novo-email" type="email" placeholder="cliente@email.com" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card card-pad">
+          <div class="card-header__title" style="margin-bottom:20px;">Detalhes da cobrança</div>
+
+          <div class="field">
+            <label for="descricao">Descrição da cobrança</label>
+            <input class="input" id="descricao" placeholder="Ex: Consultoria de marketing digital — julho" />
+          </div>
+
+          <div class="field-row" style="margin-top:16px;">
+            <div class="field">
+              <label for="valor">Valor</label>
+              <div class="input-icon-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <input class="input" id="valor" placeholder="0,00" inputmode="decimal" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="vencimento">Data de vencimento</label>
+              <input class="input" id="vencimento" type="date" />
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:16px;">
+            <label>Formas de pagamento aceitas</label>
+            <div class="option-toggle-group">
+              <label class="option-toggle" id="opt-pix">
+                <input type="checkbox" id="pay-pix" checked />
+                <span class="option-toggle__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 4.5 4.5a2 2 0 0 1 0 2.83L12 15M12 21l-4.5-4.5a2 2 0 0 1 0-2.83L12 9"/><path d="M3 12h3M18 12h3"/></svg></span>
+                <span>
+                  <span class="option-toggle__title">Pix</span><br/>
+                  <span class="option-toggle__desc">Pagamento instantâneo</span>
+                </span>
+              </label>
+              <label class="option-toggle" id="opt-cartao">
+                <input type="checkbox" id="pay-cartao" />
+                <span class="option-toggle__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20M6 15h4"/></svg></span>
+                <span>
+                  <span class="option-toggle__title">Cartão</span><br/>
+                  <span class="option-toggle__desc">Crédito, à vista ou parcelado</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field" id="parcelas-field" style="margin-top:16px;display:none;">
+            <label for="parcelas">Quantidade máxima de parcelas</label>
+            <select class="select" id="parcelas">
+              <option value="1">1x sem juros</option>
+              <option value="2">2x</option>
+              <option value="3" selected>3x</option>
+              <option value="4">4x</option>
+              <option value="5">5x</option>
+              <option value="6">6x</option>
+              <option value="10">10x</option>
+              <option value="12">12x</option>
+            </select>
+          </div>
+
+          <div class="field" style="margin-top:16px;">
+            <label for="observacoes">Observações <span class="optional">(opcional)</span></label>
+            <textarea class="textarea" id="observacoes" placeholder="Instruções adicionais para o cliente..."></textarea>
+          </div>
+        </div>
+
+        <div class="card card-pad">
+          <div class="card-header__title" style="margin-bottom:16px;">Envio da cobrança</div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <label class="checkbox-row">
+              <input type="checkbox" id="send-whatsapp" checked />
+              <span>
+                <span class="checkbox-row__label">Enviar pelo WhatsApp</span><br/>
+                <span class="checkbox-row__desc">O link de pagamento será enviado automaticamente após criar a cobrança</span>
+              </span>
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" id="send-email" />
+              <span>
+                <span class="checkbox-row__label">Enviar por e-mail</span><br/>
+                <span class="checkbox-row__desc">Requer e-mail cadastrado para o cliente</span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-pad summary-card">
+        <div class="card-header__title" style="margin-bottom:4px;">Resumo da cobrança</div>
+        <div class="card-header__subtitle" style="margin-bottom:16px;">Confira antes de criar</div>
+        <div id="summary-body"></div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn" style="margin-top:20px;">
+          <span id="submit-btn-label">Criar cobrança</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/actions.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/cobranca-form.js"></script>
+</body>
+</html>
