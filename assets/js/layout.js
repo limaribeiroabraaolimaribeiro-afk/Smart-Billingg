@@ -12,12 +12,6 @@ const SB_NAV = [
   { key: 'configuracoes', label: 'Configurações', href: 'configuracoes.html', icon: SB_ICON.settings },
 ];
 
-const SB_NOTIFICATIONS = [
-  { title: 'Pagamento recebido', desc: 'Studio Nova Design pagou R$ 4.200,00 via Pix', time: 'há 12 min', tone: 'success' },
-  { title: 'Cobrança vencendo', desc: 'João Pedro Martins vence em 3 dias', time: 'há 2 h', tone: 'warn' },
-  { title: 'Cobrança atrasada', desc: 'Rafael Augusto está com pagamento atrasado', time: 'há 1 dia', tone: 'danger' },
-];
-
 const SBLayout = (() => {
   function sidebarHtml(active) {
     const links = SB_NAV.map((item) => `
