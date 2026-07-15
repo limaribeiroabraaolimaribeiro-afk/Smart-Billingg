@@ -12,10 +12,14 @@ const SB_ACTIONS = (() => {
   function rowMenuHtml(cobranca) {
     const podeReceber = cobranca.status !== 'pago' && cobranca.status !== 'cancelado';
     const podeCancelar = cobranca.status !== 'cancelado' && cobranca.status !== 'pago';
+    const temCheckout = Boolean(cobranca.checkoutUrl);
+    const podeGerarCheckout = podeReceber && !temCheckout;
     return `
       <button class="action-menu__item" data-act="view" data-id="${cobranca.id}">${SB_ICON.eye}<span>Visualizar cobrança</span></button>
+      ${temCheckout ? `<button class="action-menu__item" data-act="opencheckout" data-id="${cobranca.id}">${SB_ICON.externalLink}<span>Abrir checkout</span></button>` : ''}
       <button class="action-menu__item" data-act="whatsapp" data-id="${cobranca.id}">${SB_ICON.whatsapp}<span>Enviar pelo WhatsApp</span></button>
       <button class="action-menu__item" data-act="copy" data-id="${cobranca.id}">${SB_ICON.link}<span>Copiar link de pagamento</span></button>
+      ${podeGerarCheckout ? `<button class="action-menu__item" data-act="checkout" data-id="${cobranca.id}">${SB_ICON.refreshCw}<span>Gerar checkout novamente</span></button>` : ''}
       ${cobranca.status === 'pago' ? `<button class="action-menu__item" data-act="receipt" data-id="${cobranca.id}">${SB_ICON.download}<span>Baixar recibo</span></button>` : ''}
       <div class="action-menu__divider"></div>
       <button class="action-menu__item" data-act="edit" data-id="${cobranca.id}">${SB_ICON.edit}<span>Editar</span></button>
@@ -32,15 +36,31 @@ const SB_ACTIONS = (() => {
       window.open(publicUrl(cobranca), '_blank');
       return;
     }
+    if (act === 'opencheckout') {
+      if (cobranca.checkoutUrl) window.open(cobranca.checkoutUrl, '_blank');
+      return;
+    }
     if (act === 'whatsapp') {
       const nome = cobranca.cliente?.nome || 'cliente';
-      const msg = `Olá ${nome}! Segue o link para pagamento da cobrança "${cobranca.descricao}" no valor de ${SB_UI.formatCurrency(cobranca.valor)}: ${publicUrl(cobranca)}`;
+      const link = cobranca.checkoutUrl || publicUrl(cobranca);
+      const msg = `Olá ${nome}! Segue o link para pagamento da cobrança "${cobranca.descricao}" no valor de ${SB_UI.formatCurrency(cobranca.valor)}: ${link}`;
       window.open(SB_UI.whatsappLink(cobranca.cliente?.whatsapp, msg), '_blank');
       return;
     }
     if (act === 'copy') {
       await SB_UI.copyToClipboard(publicUrl(cobranca));
       SB_UI.toast({ type: 'success', title: 'Link copiado', desc: 'O link de pagamento foi copiado para a área de transferência.' });
+      return;
+    }
+    if (act === 'checkout') {
+      SB_UI.toast({ type: 'info', title: 'Gerando checkout...', desc: cobranca.codigo });
+      const result = await DB.cobrancas.generateCheckout(cobranca.id);
+      if (result?.success) {
+        SB_UI.toast({ type: 'success', title: 'Link de pagamento criado com sucesso', desc: cobranca.codigo });
+      } else {
+        SB_UI.toast({ type: 'error', title: 'Não foi possível gerar o checkout', desc: result?.message || 'Tente novamente em instantes.' });
+      }
+      onChange?.();
       return;
     }
     if (act === 'receipt') {

@@ -31,7 +31,7 @@
   }
 
   function receiptUrl(r) {
-    return `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}pagamento-confirmado.html?token=${r.publicToken || r.id}`;
+    return `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}recibo-publico.html?token=${r.publicToken || r.id}`;
   }
 
   function menuHtml(r) {

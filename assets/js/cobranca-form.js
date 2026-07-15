@@ -237,13 +237,23 @@
         saved = await DB.cobrancas.create(payload);
       }
 
+      SB_UI.toast({ type: 'success', title: isEdit ? 'Cobrança atualizada' : 'Cobrança criada com sucesso', desc: saved.codigo });
+
+      if (!isEdit) {
+        const checkoutResult = await DB.cobrancas.generateCheckout(saved.id);
+        if (checkoutResult?.success) {
+          SB_UI.toast({ type: 'success', title: 'Link de pagamento criado com sucesso', desc: saved.codigo });
+        } else {
+          SB_UI.toast({ type: 'error', title: 'Cobrança criada, mas não foi possível gerar o checkout.', desc: 'Você pode gerar novamente em Cobranças.' });
+        }
+      }
+
       if (els.sendWhatsapp.checked) {
         SB_UI.toast({ type: 'success', title: 'Cobrança enviada pelo WhatsApp', desc: `Link de pagamento enviado para ${currentClientLabel()}.` });
       }
       if (els.sendEmail.checked) {
         SB_UI.toast({ type: 'success', title: 'Cobrança enviada por e-mail' });
       }
-      SB_UI.toast({ type: 'success', title: isEdit ? 'Cobrança atualizada' : 'Cobrança criada com sucesso', desc: saved.codigo });
 
       setTimeout(() => { window.location.href = 'cobrancas.html'; }, 700);
     } catch (err) {

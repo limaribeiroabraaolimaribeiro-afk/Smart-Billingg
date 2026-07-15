@@ -381,6 +381,14 @@ const DB = (() => {
           return { cobranca: { ...cob }, pagamento, recibo };
         });
       },
+      // Sem integração real disponível em modo de demonstração — não simula
+      // aprovação nem gera link de checkout falso.
+      generateCheckout() {
+        return delay(() => ({ success: false, message: 'Checkout indisponível em modo de demonstração.' }));
+      },
+      checkInfinitePayPayment() {
+        return delay(() => ({ success: false, paid: false }));
+      },
     };
 
     const pagamentos = {
@@ -725,6 +733,31 @@ const DB = (() => {
         const row = Array.isArray(result) ? result[0] : result;
         const cobranca = await cobrancas.get(id);
         return { cobranca, pagamento: { id: row?.payment_id }, recibo: { id: row?.receipt_id } };
+      },
+      // Chama a Edge Function create-infinitepay-checkout (autenticada) para
+      // gerar/reaproveitar o checkout_url de uma cobrança já salva no banco.
+      async generateCheckout(id) {
+        const { data, error } = await client.functions.invoke('create-infinitepay-checkout', {
+          body: { charge_id: id },
+        });
+        if (error) {
+          let message = 'Não foi possível gerar o checkout.';
+          try {
+            const body = await error.context?.json?.();
+            if (body?.message) message = body.message;
+          } catch (_) { /* mantém mensagem genérica */ }
+          return { success: false, message };
+        }
+        return data;
+      },
+      // Chama a Edge Function pública check-infinitepay-payment a partir da
+      // tela de retorno do checkout (sem exigir sessão).
+      async checkInfinitePayPayment(payload) {
+        const { data, error } = await client.functions.invoke('check-infinitepay-payment', { body: payload });
+        if (error) {
+          return { success: false, paid: false };
+        }
+        return data;
       },
     };
 

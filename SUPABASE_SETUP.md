@@ -175,35 +175,47 @@ está reativada para produção.
 - ✅ **Project URL** (`supabaseUrl`)
 - ✅ **anon / publishable key** (`supabaseAnonKey`) — é protegida pelo RLS;
   sozinha, ela não dá acesso a nada que as políticas não permitam.
-- ✅ **Client ID** público de um futuro checkout da InfinitePay (identifica
-  o checkout, não autentica nada sensível).
 
 ## 14. Quais chaves NUNCA podem ficar no frontend
 
 - ❌ **service_role key** do Supabase (ignora todo o RLS — só pode existir
   em Edge Functions/backend, nunca em arquivos servidos ao navegador).
-- ❌ Chave secreta de API da InfinitePay (`INFINITEPAY_API_KEY`).
-- ❌ Segredo de validação de webhook (`INFINITEPAY_WEBHOOK_SECRET`).
+- ❌ **InfiniteTag / `INFINITEPAY_HANDLE`** — mesmo não sendo uma senha, ela
+  só é usada dentro das Edge Functions para montar as chamadas oficiais à
+  InfinitePay; o frontend nunca precisa dela diretamente.
 - ❌ Senha do banco de dados Postgres.
+
+Não existe, nesta integração, nenhuma API key privada ou segredo de
+assinatura de webhook da InfinitePay a ser cadastrado — apenas a InfiniteTag
+(identificador público da conta) e a URL pública do site.
 
 ---
 
-## 15. Como futuramente configurar os secrets da InfinitePay
+## 15. Checkout Integrado da InfinitePay (implementado)
 
-Quando a integração for implementada (veja `supabase/functions/README.md`),
-os segredos devem ser configurados via CLI do Supabase, nunca em arquivo de
-código:
+A integração real de pagamentos já está implementada em
+`supabase/functions/create-infinitepay-checkout`,
+`supabase/functions/infinitepay-webhook` e
+`supabase/functions/check-infinitepay-payment`. O guia completo — como
+habilitar o Checkout Integrado na InfinitePay, onde encontrar a InfiniteTag,
+quais secrets cadastrar, como rodar `sql/infinitepay_integration.sql`, como
+publicar as três functions, como testar com uma cobrança de valor baixo, como
+acompanhar logs, o que conferir no banco e como desfazer um teste — está em
+[`supabase/functions/README.md`](supabase/functions/README.md).
+
+Resumo rápido dos secrets:
 
 ```bash
-supabase login
-supabase link --project-ref SEU_PROJECT_REF
-supabase secrets set INFINITEPAY_API_KEY=xxxxx
-supabase secrets set INFINITEPAY_WEBHOOK_SECRET=xxxxx
+supabase secrets set INFINITEPAY_HANDLE=suaempresa   # sem o símbolo $
+supabase secrets set PUBLIC_APP_URL=https://seudominio.com
 ```
 
 Esses segredos ficam disponíveis apenas dentro das Edge Functions
 (`create-infinitepay-checkout`, `infinitepay-webhook`,
-`check-infinitepay-payment`), nunca no navegador do usuário final.
+`check-infinitepay-payment`), nunca no navegador do usuário final. **Nunca
+marque uma cobrança como paga apenas pelo redirect de retorno** — a
+confirmação real sempre passa pela consulta oficial `payment_check` da
+InfinitePay dentro das Edge Functions.
 
 ---
 

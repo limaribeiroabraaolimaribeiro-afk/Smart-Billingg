@@ -12,6 +12,18 @@
   const token = params.get('token') || params.get('id');
   const region = document.getElementById('public-region');
 
+  // Só redireciona para URLs https do domínio oficial do checkout da
+  // InfinitePay — nunca confia cegamente no valor salvo no banco.
+  function isTrustedCheckoutUrl(url) {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'https:' && parsed.hostname === 'checkout.infinitepay.com.br';
+    } catch (err) {
+      return false;
+    }
+  }
+
   function shell(inner) {
     return `<div class="public-card">${inner}</div>`;
   }
@@ -207,14 +219,17 @@
     if (!hasCheckout) {
       SB_UI.toast({
         type: 'info',
-        title: 'Checkout ainda não configurado',
-        desc: 'O checkout ainda não foi configurado para esta cobrança.',
+        title: 'O link de pagamento ainda não foi gerado.',
+        desc: 'Tente novamente em instantes ou entre em contato com quem emitiu a cobrança.',
         duration: 5000,
       });
       return;
     }
-    // Quando checkout_url existir (integração futura com a InfinitePay),
-    // o cliente é redirecionado para o checkout real do provedor.
+    if (!isTrustedCheckoutUrl(cobranca.checkoutUrl)) {
+      SB_UI.toast({ type: 'error', title: 'Não foi possível abrir o pagamento', desc: 'Tente novamente em instantes.' });
+      return;
+    }
+    // Redireciona para o Checkout Integrado real da InfinitePay.
     window.location.href = cobranca.checkoutUrl;
   });
 })();
