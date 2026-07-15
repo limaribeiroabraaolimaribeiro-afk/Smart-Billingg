@@ -301,16 +301,18 @@
 .action-btn svg { width: 16px; height: 16px; }
 
 .action-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
+  /* position/top/left são calculados em JS (SB_UI.toggleMenu) e aplicados
+     via style inline com position: fixed, para escapar de qualquer
+     overflow:hidden/auto de containers ancestrais (ex.: .table-wrap). */
+  position: fixed;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   min-width: 200px;
+  max-width: calc(100vw - 16px);
   padding: 6px;
-  z-index: 50;
+  z-index: 9999;
   display: none;
 }
 .action-menu.is-open { display: block; }

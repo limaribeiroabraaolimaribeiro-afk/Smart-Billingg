@@ -171,29 +171,122 @@ const SB_UI = (() => {
     };
   }
 
+  // ---------- Menus de ação (dropdowns) ----------
+  // Em vez de posicionar o menu com CSS (position: absolute relativo ao
+  // botão), calculamos a posição em JS e aplicamos position: fixed. Isso faz
+  // o menu escapar de qualquer overflow:hidden/auto de containers ancestrais
+  // (ex.: .table-wrap) sem precisar mover o elemento no DOM — o que quebraria
+  // a delegação de cliques que cada página já usa nos itens do menu.
+  // Estado do menu aberto é único no módulo: só um menu fica aberto por vez
+  // em toda a página (linhas de tabela e topbar incluídos).
+  let _openMenu = null;
+  let _openTrigger = null;
+
+  function _clearMenuPosition(menu) {
+    menu.style.position = '';
+    menu.style.top = '';
+    menu.style.left = '';
+    menu.style.visibility = '';
+  }
+
+  function closeOpenMenu() {
+    if (_openMenu) {
+      _openMenu.classList.remove('is-open');
+      _clearMenuPosition(_openMenu);
+    }
+    _openMenu = null;
+    _openTrigger = null;
+  }
+
+  function _positionMenu(trigger, menu) {
+    const MARGIN = 8;
+    menu.style.visibility = 'hidden';
+    menu.classList.add('is-open');
+    const triggerRect = trigger.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const viewportW = document.documentElement.clientWidth;
+    const viewportH = document.documentElement.clientHeight;
+
+    let left = triggerRect.right - menuRect.width;
+    if (left < MARGIN) left = MARGIN;
+    if (left + menuRect.width > viewportW - MARGIN) left = Math.max(MARGIN, viewportW - MARGIN - menuRect.width);
+
+    const spaceBelow = viewportH - triggerRect.bottom;
+    const spaceAbove = triggerRect.top;
+    let top;
+    if (spaceBelow >= menuRect.height + MARGIN || spaceBelow >= spaceAbove) {
+      top = triggerRect.bottom + 4;
+    } else {
+      top = triggerRect.top - menuRect.height - 4;
+    }
+    if (top < MARGIN) top = MARGIN;
+    if (top + menuRect.height > viewportH - MARGIN) top = Math.max(MARGIN, viewportH - MARGIN - menuRect.height);
+
+    menu.style.position = 'fixed';
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    menu.style.visibility = '';
+  }
+
+  function toggleMenu(trigger, menu) {
+    if (_openMenu === menu) { closeOpenMenu(); return; }
+    closeOpenMenu();
+    _positionMenu(trigger, menu);
+    _openMenu = menu;
+    _openTrigger = trigger;
+  }
+
+  // Fecha/reposiciona em interações globais — registrado uma única vez.
+  document.addEventListener('click', (e) => {
+    if (!_openMenu) return;
+    if (e.target.closest('.action-menu') || e.target.closest('[data-menu-toggle]')) return;
+    closeOpenMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeOpenMenu();
+  });
+  window.addEventListener('resize', () => {
+    if (_openMenu && _openTrigger) _positionMenu(_openTrigger, _openMenu);
+  });
+  window.addEventListener('scroll', () => closeOpenMenu(), true);
+
   // Event-delegated dropdown menus for dynamically rendered rows.
   // Trigger: [data-menu-toggle="ID"]  Menu: [data-menu="ID"]
   function initActionMenus(root = document) {
     root.addEventListener('click', (e) => {
       const trigger = e.target.closest('[data-menu-toggle]');
-      if (trigger) {
-        e.stopPropagation();
-        const id = trigger.getAttribute('data-menu-toggle');
-        const menu = root.querySelector(`[data-menu="${id}"]`);
-        const willOpen = menu && !menu.classList.contains('is-open');
-        root.querySelectorAll('.action-menu.is-open').forEach((m) => m.classList.remove('is-open'));
-        if (willOpen) menu.classList.add('is-open');
-        return;
-      }
-      if (!e.target.closest('.action-menu')) {
-        root.querySelectorAll('.action-menu.is-open').forEach((m) => m.classList.remove('is-open'));
-      }
+      if (!trigger) return;
+      e.stopPropagation();
+      const id = trigger.getAttribute('data-menu-toggle');
+      const menu = root.querySelector(`[data-menu="${id}"]`);
+      if (menu) toggleMenu(trigger, menu);
     });
+  }
+
+  // Para pares botão/menu com IDs fixos (ex.: sino e menu do usuário no topbar).
+  function wireMenuTrigger(trigger, menu) {
+    if (!trigger || !menu) return;
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMenu(trigger, menu);
+    });
+  }
+
+  // ---------- Base URL do projeto (funciona em qualquer subdiretório, ex. GitHub Pages) ----------
+  function appBaseUrl() {
+    return `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`;
+  }
+
+  // ---------- Rótulo de forma de pagamento (reaproveitado por listagens e PDF) ----------
+  function paymentMethodLabel(forma, parcelas) {
+    if (forma === 'pix') return 'Pix';
+    if (forma === 'cartao') return parcelas > 1 ? `Cartão · ${parcelas}x` : 'Cartão · à vista';
+    return forma || '—';
   }
 
   return {
     formatCurrency, formatDate, formatDateTime, initials, statusMeta, badgeHtml,
     escapeHtml, toast, confirmDialog, copyToClipboard, whatsappLink, debounce,
-    initActionMenus,
+    initActionMenus, wireMenuTrigger, closeOpenMenu, appBaseUrl, paymentMethodLabel,
   };
 })();
