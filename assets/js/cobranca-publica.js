@@ -12,13 +12,21 @@
   const token = params.get('token') || params.get('id');
   const region = document.getElementById('public-region');
 
-  // Só redireciona para URLs https do domínio oficial do checkout da
-  // InfinitePay — nunca confia cegamente no valor salvo no banco.
+  // Domínios oficiais do checkout hospedado pela InfinitePay (mesma lista
+  // usada em supabase/functions/_shared/infinitepay.ts). Só redireciona para
+  // URLs https com hostname EXATO nesta lista — nunca confia cegamente no
+  // valor salvo no banco, nem usa includes()/substring (aceitaria hosts
+  // forjados como "checkout.infinitepay.io.site-falso.com").
+  const INFINITEPAY_CHECKOUT_HOSTS = new Set([
+    'checkout.infinitepay.com.br',
+    'checkout.infinitepay.io',
+  ]);
+
   function isTrustedCheckoutUrl(url) {
     if (!url) return false;
     try {
       const parsed = new URL(url);
-      return parsed.protocol === 'https:' && parsed.hostname === 'checkout.infinitepay.com.br';
+      return parsed.protocol === 'https:' && INFINITEPAY_CHECKOUT_HOSTS.has(parsed.hostname.toLowerCase());
     } catch (err) {
       return false;
     }

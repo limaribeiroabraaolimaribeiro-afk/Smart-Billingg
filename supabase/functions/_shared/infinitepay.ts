@@ -11,10 +11,14 @@
 export const INFINITEPAY_LINKS_URL = 'https://api.checkout.infinitepay.io/links';
 export const INFINITEPAY_PAYMENT_CHECK_URL = 'https://api.checkout.infinitepay.io/payment_check';
 
-// Domínio oficial do checkout hospedado pela InfinitePay. Usado para validar
-// a URL retornada por /links antes de salvá-la, e pelo frontend público
+// Domínios oficiais do checkout hospedado pela InfinitePay. A API de criação
+// de link (POST /links) pode responder com qualquer um destes hosts — usado
+// para validar a URL retornada antes de salvá-la, e pelo frontend público
 // antes de redirecionar o cliente para pagamento.
-const TRUSTED_CHECKOUT_HOSTS = ['checkout.infinitepay.com.br'];
+const INFINITEPAY_CHECKOUT_HOSTS = new Set([
+  'checkout.infinitepay.com.br',
+  'checkout.infinitepay.io',
+]);
 
 export const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -80,13 +84,16 @@ export function mapCaptureMethod(captureMethod: string | null | undefined): 'pix
 }
 
 // ---------------------------------------------------------------------------
-// Validação de URL de checkout — exige https e domínio oficial da InfinitePay.
+// Validação de URL de checkout — exige https, URL bem formada (new URL()) e
+// hostname com correspondência EXATA a um dos domínios oficiais da
+// InfinitePay (nunca substring/includes — isso aceitaria hosts forjados como
+// "checkout.infinitepay.io.site-falso.com").
 // ---------------------------------------------------------------------------
 export function isValidInfinitePayCheckoutUrl(url: string | null | undefined): boolean {
   if (!url) return false;
   try {
     const parsed = new URL(url);
-    return parsed.protocol === 'https:' && TRUSTED_CHECKOUT_HOSTS.includes(parsed.hostname);
+    return parsed.protocol === 'https:' && INFINITEPAY_CHECKOUT_HOSTS.has(parsed.hostname.toLowerCase());
   } catch {
     return false;
   }

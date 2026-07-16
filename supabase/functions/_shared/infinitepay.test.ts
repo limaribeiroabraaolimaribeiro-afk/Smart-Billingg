@@ -66,17 +66,26 @@ Deno.test('mapCaptureMethod retorna null para método desconhecido', () => {
 });
 
 // ---------------- isValidInfinitePayCheckoutUrl ----------------
-Deno.test('isValidInfinitePayCheckoutUrl aceita URL https do domínio oficial', () => {
+Deno.test('isValidInfinitePayCheckoutUrl aceita URL https do domínio .com.br', () => {
   assertEquals(isValidInfinitePayCheckoutUrl('https://checkout.infinitepay.com.br/abc123'), true);
+});
+
+Deno.test('isValidInfinitePayCheckoutUrl aceita URL https do domínio .io (resposta real da API /links)', () => {
+  assertEquals(isValidInfinitePayCheckoutUrl('https://checkout.infinitepay.io/abraao-lima-ribeiro-720?lenc=abc'), true);
 });
 
 Deno.test('isValidInfinitePayCheckoutUrl rejeita http (não https)', () => {
   assertEquals(isValidInfinitePayCheckoutUrl('http://checkout.infinitepay.com.br/abc123'), false);
+  assertEquals(isValidInfinitePayCheckoutUrl('http://checkout.infinitepay.io/abc123'), false);
 });
 
 Deno.test('isValidInfinitePayCheckoutUrl rejeita domínio diferente (phishing/typo)', () => {
   assertEquals(isValidInfinitePayCheckoutUrl('https://checkout.infinitepay.com.br.evil.com/x'), false);
   assertEquals(isValidInfinitePayCheckoutUrl('https://evil.com/checkout.infinitepay.com.br'), false);
+});
+
+Deno.test('isValidInfinitePayCheckoutUrl rejeita subdomínio forjado do host .io', () => {
+  assertEquals(isValidInfinitePayCheckoutUrl('https://checkout.infinitepay.io.site-falso.com/x'), false);
 });
 
 Deno.test('isValidInfinitePayCheckoutUrl rejeita URL ausente/malformada', () => {
