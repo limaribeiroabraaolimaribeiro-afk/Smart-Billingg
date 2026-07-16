@@ -176,6 +176,7 @@
   try {
     await refresh();
   } catch (err) {
+    console.error('[Smart Billing] dashboard: falha ao carregar —', err?.message || err, err?.stack);
     document.getElementById('stat-grid').innerHTML = '';
     tableRegion.innerHTML = `
       <div class="state-block is-error">
@@ -184,5 +185,9 @@
         <p class="state-block__desc">Ocorreu um erro ao buscar os dados. Tente novamente.</p>
         <button class="btn btn-secondary btn-sm" onclick="location.reload()">Tentar novamente</button>
       </div>`;
+  } finally {
+    // Rede de segurança: garante que nenhum skeleton fique preso na tela,
+    // mesmo que refresh() tenha falhado parcialmente antes de renderizar.
+    document.querySelectorAll('.skeleton').forEach((el) => el.remove());
   }
 })();

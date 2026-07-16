@@ -57,19 +57,11 @@ const SBLayout = (() => {
           ${primary}
           <div style="position:relative">
             <button class="icon-btn" id="sb-notif-btn" aria-label="Notificações">
-              ${SB_ICON.bell}<span class="icon-btn__dot"></span>
+              ${SB_ICON.bell}<span class="icon-btn__dot" id="sb-notif-dot" style="display:none;"></span>
             </button>
             <div class="action-menu" id="sb-notif-menu" style="min-width:300px;right:0;">
               <div style="padding:8px 10px;font-size:12.5px;font-weight:800;color:var(--text-primary);">Notificações</div>
-              ${SB_NOTIFICATIONS.map((n) => `
-                <div class="action-menu__item" style="align-items:flex-start;cursor:default;">
-                  <span style="width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;background:${n.tone === 'success' ? 'var(--green-500)' : n.tone === 'warn' ? 'var(--amber-500)' : 'var(--red-500)'}"></span>
-                  <span style="display:flex;flex-direction:column;gap:2px;">
-                    <span style="font-weight:700;color:var(--text-primary);">${n.title}</span>
-                    <span style="font-size:11.5px;color:var(--text-muted);font-weight:500;">${n.desc}</span>
-                    <span style="font-size:10.5px;color:var(--text-muted);">${n.time}</span>
-                  </span>
-                </div>`).join('<div class="action-menu__divider"></div>')}
+              <div id="sb-notif-list">${notifEmptyStateHtml()}</div>
             </div>
           </div>
           <div style="position:relative">
@@ -89,6 +81,12 @@ const SBLayout = (() => {
           </div>
         </div>
       </header>`;
+  }
+
+  // Estado inicial exibido antes (ou em caso de falha) do carregamento real
+  // das notificações — nunca deixa o menu vazio/quebrado.
+  function notifEmptyStateHtml() {
+    return `<div class="action-menu__item" style="cursor:default;color:var(--text-muted);font-size:12.5px;">Nenhuma notificação no momento</div>`;
   }
 
   function demoBannerHtml() {
@@ -122,6 +120,7 @@ const SBLayout = (() => {
 
     wireInteractions();
     loadUser();
+    loadNotifications();
     document.title = opts.title ? `${opts.title} · Smart Billing` : 'Smart Billing';
   }
 
@@ -184,6 +183,22 @@ const SBLayout = (() => {
     } catch (e) {
       const nameEl = document.getElementById('sb-user-name');
       if (nameEl) nameEl.textContent = 'Administrador';
+    }
+  }
+
+  // Carregada de forma independente do resto do layout: se notifications.js
+  // não estiver presente, ou a consulta falhar, o menu simplesmente mantém
+  // o estado vazio já renderizado em topbarHtml() — nunca bloqueia sidebar,
+  // topbar ou o restante da página.
+  async function loadNotifications() {
+    const listEl = document.getElementById('sb-notif-list');
+    const dotEl = document.getElementById('sb-notif-dot');
+    try {
+      await window.SB_NOTIFICATIONS?.init?.({ listEl, dotEl });
+    } catch (err) {
+      console.warn('[Smart Billing] Falha ao carregar notificações:', err?.message || err);
+      if (listEl) listEl.innerHTML = notifEmptyStateHtml();
+      if (dotEl) dotEl.style.display = 'none';
     }
   }
 
