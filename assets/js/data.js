@@ -214,7 +214,7 @@ const DB = (() => {
           cnpj: '32.145.678/0001-90',
           email: 'financeiro@smartbilling.com.br',
           telefone: '(11) 4000-1234',
-          admin: { nome: 'Abraão Ribeiro', email: 'limaribeiroabraaolimaribeiro@gmail.com', cargo: 'Administrador' },
+          admin: { nome: 'Abraão Ribeiro', email: 'limaribeiroabraaolimaribeiro@gmail.com', telefone: '', cargo: 'Administrador' },
         },
       };
     }
@@ -473,7 +473,41 @@ const DB = (() => {
       },
     };
 
-    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa };
+    // ---------------- agente de WhatsApp ----------------
+    // Envio automático depende de infraestrutura real (Supabase + agente
+    // local) — em modo de demonstração não há fila nem agente conectado.
+    // As preferências ficam em memória (não persistem) só para a UI não
+    // quebrar; nenhuma mensagem é realmente enfileirada.
+    let demoWaSettings = {
+      sendChargeOnCreate: false,
+      sendReceiptOnPayment: false,
+      remind3DaysBefore: false,
+      remind1DayBefore: false,
+      remindOnDueDate: false,
+      remindWhenOverdue: false,
+    };
+    const whatsapp = {
+      getAgentState() {
+        return delay(() => null);
+      },
+      getSettings() {
+        return delay(() => ({ companyId: null, ...demoWaSettings }));
+      },
+      updateSettings(payload) {
+        return delay(() => {
+          demoWaSettings = { ...demoWaSettings, ...payload };
+          return { companyId: null, ...demoWaSettings };
+        });
+      },
+      enqueue() {
+        return delay(() => ({ success: false, message: 'Envio automático de WhatsApp disponível apenas com o Supabase configurado.' }));
+      },
+      history() {
+        return delay(() => []);
+      },
+    };
+
+    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa, whatsapp };
   }
 
   // ==========================================================================
@@ -900,6 +934,7 @@ const DB = (() => {
           admin: {
             nome: profile.name,
             email: profile.email,
+            telefone: profile.phone || '',
             cargo: ROLE_LABEL[member?.role] || 'Membro',
           },
         };
@@ -921,6 +956,7 @@ const DB = (() => {
           const profilePatch = {};
           if (payload.admin.nome !== undefined) profilePatch.name = payload.admin.nome;
           if (payload.admin.email !== undefined) profilePatch.email = payload.admin.email;
+          if (payload.admin.telefone !== undefined) profilePatch.phone = payload.admin.telefone;
           // "cargo" reflete o papel em company_members e não é editável por aqui
           // (evita que um usuário se autopromova a owner/admin sem controle).
           if (Object.keys(profilePatch).length) {
@@ -932,7 +968,104 @@ const DB = (() => {
       },
     };
 
-    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa };
+    // ---------------- agente de WhatsApp ----------------
+    function mapAgentState(row) {
+      if (!row) return null;
+      return {
+        status: row.status,
+        phoneNumber: row.phone_number,
+        displayName: row.display_name,
+        qrCode: row.qr_code,
+        lastSeenAt: row.last_seen_at,
+        connectedAt: row.connected_at,
+        disconnectedAt: row.disconnected_at,
+        errorMessage: row.error_message,
+      };
+    }
+
+    function mapWaSettings(row, companyId) {
+      return {
+        companyId,
+        sendChargeOnCreate: Boolean(row?.send_charge_on_create),
+        sendReceiptOnPayment: Boolean(row?.send_receipt_on_payment),
+        remind3DaysBefore: Boolean(row?.remind_3_days_before),
+        remind1DayBefore: Boolean(row?.remind_1_day_before),
+        remindOnDueDate: Boolean(row?.remind_on_due_date),
+        remindWhenOverdue: Boolean(row?.remind_when_overdue),
+      };
+    }
+
+    function mapWaOutbox(row) {
+      if (!row) return null;
+      return {
+        id: row.id,
+        recipient: row.recipient,
+        message: row.message,
+        messageType: row.message_type,
+        status: row.status,
+        attempts: row.attempts,
+        whatsappMessageId: row.whatsapp_message_id,
+        errorMessage: row.error_message,
+        scheduledAt: row.scheduled_at,
+        sentAt: row.sent_at,
+        failedAt: row.failed_at,
+        createdAt: row.created_at,
+      };
+    }
+
+    const whatsapp = {
+      async getAgentState() {
+        const companyId = await getCompanyId();
+        const data = unwrap(await client.from('whatsapp_agent_state').select('*').eq('company_id', companyId).maybeSingle());
+        return mapAgentState(data);
+      },
+      async getSettings() {
+        const companyId = await getCompanyId();
+        const data = unwrap(await client.from('whatsapp_settings').select('*').eq('company_id', companyId).maybeSingle());
+        return mapWaSettings(data, companyId);
+      },
+      async updateSettings(payload) {
+        const companyId = await getCompanyId();
+        const patch = { company_id: companyId };
+        if (payload.sendChargeOnCreate !== undefined) patch.send_charge_on_create = payload.sendChargeOnCreate;
+        if (payload.sendReceiptOnPayment !== undefined) patch.send_receipt_on_payment = payload.sendReceiptOnPayment;
+        if (payload.remind3DaysBefore !== undefined) patch.remind_3_days_before = payload.remind3DaysBefore;
+        if (payload.remind1DayBefore !== undefined) patch.remind_1_day_before = payload.remind1DayBefore;
+        if (payload.remindOnDueDate !== undefined) patch.remind_on_due_date = payload.remindOnDueDate;
+        if (payload.remindWhenOverdue !== undefined) patch.remind_when_overdue = payload.remindWhenOverdue;
+        const row = unwrap(await client.from('whatsapp_settings').upsert(patch, { onConflict: 'company_id' }).select('*').single());
+        return mapWaSettings(row, companyId);
+      },
+      // Único caminho para enfileirar mensagens — chama a função do banco
+      // enqueue_whatsapp_message(), que resolve o destinatário real a partir
+      // do charge_id/receipt_id/client_id (nunca aceita recipient do navegador).
+      async enqueue({ messageType, message, chargeId = null, receiptId = null, clientId = null, idempotencyKey = null }) {
+        const companyId = await getCompanyId();
+        const { data, error } = await client.rpc('enqueue_whatsapp_message', {
+          p_company_id: companyId,
+          p_message_type: messageType,
+          p_message: message,
+          p_charge_id: chargeId,
+          p_receipt_id: receiptId,
+          p_client_id: clientId,
+          p_idempotency_key: idempotencyKey,
+        });
+        if (error) {
+          return { success: false, message: error.message || 'Não foi possível enfileirar a mensagem.' };
+        }
+        return { success: true, job: mapWaOutbox(data) };
+      },
+      async history({ chargeId, receiptId, limit = 10 } = {}) {
+        const companyId = await getCompanyId();
+        let query = client.from('whatsapp_outbox').select('*').eq('company_id', companyId).order('created_at', { ascending: false }).limit(limit);
+        if (chargeId) query = query.eq('charge_id', chargeId);
+        if (receiptId) query = query.eq('receipt_id', receiptId);
+        const data = unwrap(await query);
+        return data.map(mapWaOutbox);
+      },
+    };
+
+    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa, whatsapp };
   }
 
   const backend = useDemo ? buildDemoBackend() : buildSupabaseBackend();

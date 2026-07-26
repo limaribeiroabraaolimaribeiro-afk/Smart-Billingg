@@ -40,7 +40,10 @@
       <button class="action-menu__item" data-act="download" data-id="${r.id}">${SB_ICON.download}<span>Baixar PDF</span></button>
       <button class="action-menu__item" data-act="copy" data-id="${r.id}">${SB_ICON.link}<span>Copiar link</span></button>
       <div class="action-menu__divider"></div>
-      <button class="action-menu__item" data-act="whatsapp" data-id="${r.id}">${SB_ICON.whatsapp}<span>Enviar pelo WhatsApp</span></button>
+      <button class="action-menu__item" data-act="whatsapp" data-id="${r.id}">${SB_ICON.whatsapp}<span>Abrir no WhatsApp Web</span></button>
+      <button class="action-menu__item" data-act="whatsapp-send" data-id="${r.id}">${SB_ICON.whatsapp}<span>Enviar recibo (agente WhatsApp)</span></button>
+      <button class="action-menu__item" data-act="whatsapp-copy" data-id="${r.id}">${SB_ICON.copy}<span>Copiar mensagem</span></button>
+      <button class="action-menu__item" data-act="whatsapp-history" data-id="${r.id}">${SB_ICON.clock}<span>Ver histórico de envio</span></button>
       <button class="action-menu__item" data-act="email" data-id="${r.id}">${SB_ICON.mail}<span>Enviar por e-mail</span></button>
     `;
   }
@@ -111,6 +114,18 @@
       <div class="card-list">${rows.map(cardHtml).join('')}</div>`;
   }
 
+  let _empresaNomeCache = null;
+  async function getEmpresaNome() {
+    if (_empresaNomeCache) return _empresaNomeCache;
+    try {
+      const empresa = await DB.empresa.get();
+      _empresaNomeCache = empresa?.nome || 'Smart Billing';
+    } catch (_) {
+      _empresaNomeCache = 'Smart Billing';
+    }
+    return _empresaNomeCache;
+  }
+
   function mailtoFallback(r) {
     const email = r.cliente?.email;
     if (!email) return;
@@ -163,6 +178,77 @@
       SB_UI.closeOpenMenu();
       const msg = `Olá ${r.cliente?.nome || ''}! Segue o recibo ${r.numero} referente ao pagamento de ${SB_UI.formatCurrency(r.pagamento?.valor || 0)}: ${receiptUrl(r)}`;
       window.open(SB_UI.whatsappLink(r.cliente?.whatsapp, msg), '_blank');
+      return;
+    }
+
+    if (act === 'whatsapp-send') {
+      SB_UI.closeOpenMenu();
+      if (!r.cliente?.whatsapp) {
+        SB_UI.toast({ type: 'error', title: 'Cliente sem WhatsApp cadastrado', desc: 'Cadastre um WhatsApp para este cliente antes de enviar.' });
+        return;
+      }
+      const empresaNome = await getEmpresaNome();
+      const message = SB_WA.receiptMessage(r, empresaNome);
+      const ok = await SB_UI.confirmDialog({
+        title: 'Enviar recibo pelo WhatsApp',
+        desc: `Enviar o recibo ${r.numero} para ${r.cliente.whatsapp}? A mensagem entra na fila do agente de WhatsApp conectado.`,
+        confirmLabel: 'Adicionar à fila',
+        cancelLabel: 'Cancelar',
+        tone: 'warn',
+      });
+      if (!ok) return;
+
+      SB_UI.toast({ type: 'info', title: 'Adicionando à fila...' });
+      try {
+        const result = await DB.whatsapp.enqueue({
+          messageType: 'receipt',
+          message,
+          receiptId: r.id,
+          idempotencyKey: `receipt-manual:${r.id}:${Date.now()}`,
+        });
+        if (result?.success) {
+          SB_UI.toast({ type: 'success', title: 'Mensagem adicionada à fila', desc: 'Será enviada quando o WhatsApp estiver conectado.' });
+        } else {
+          console.error('[Smart Billing] Falha ao enfileirar recibo no WhatsApp:', result?.message);
+          SB_UI.toast({ type: 'error', title: 'Não foi possível enfileirar a mensagem', desc: result?.message || 'Tente novamente em instantes.' });
+        }
+      } catch (err) {
+        console.error('[Smart Billing] Erro inesperado ao enfileirar WhatsApp:', err);
+        SB_UI.toast({ type: 'error', title: 'Não foi possível enfileirar a mensagem', desc: 'Tente novamente em instantes.' });
+      }
+      return;
+    }
+
+    if (act === 'whatsapp-copy') {
+      SB_UI.closeOpenMenu();
+      const empresaNome = await getEmpresaNome();
+      await SB_UI.copyToClipboard(SB_WA.receiptMessage(r, empresaNome));
+      SB_UI.toast({ type: 'success', title: 'Mensagem copiada' });
+      return;
+    }
+
+    if (act === 'whatsapp-history') {
+      SB_UI.closeOpenMenu();
+      try {
+        const history = await DB.whatsapp.history({ receiptId: r.id, limit: 5 });
+        if (!history.length) {
+          SB_UI.toast({ type: 'info', title: 'Nenhum envio registrado ainda' });
+          return;
+        }
+        const last = history[0];
+        const statusLabel = { pending: 'Na fila', processing: 'Enviando', sent: 'Enviado', failed: 'Falhou', cancelled: 'Cancelado' };
+        const sent = history.filter((h) => h.status === 'sent').length;
+        const failed = history.filter((h) => h.status === 'failed').length;
+        const pending = history.filter((h) => h.status === 'pending' || h.status === 'processing').length;
+        SB_UI.toast({
+          type: last.status === 'failed' ? 'error' : (last.status === 'sent' ? 'success' : 'info'),
+          title: `Último envio: ${statusLabel[last.status] || last.status}`,
+          desc: `${sent} enviada(s) · ${failed} falhada(s) · ${pending} na fila · ${SB_UI.formatDateTime(last.createdAt)}`,
+        });
+      } catch (err) {
+        console.error('[Smart Billing] Falha ao carregar histórico de WhatsApp:', err);
+        SB_UI.toast({ type: 'error', title: 'Não foi possível carregar o histórico' });
+      }
       return;
     }
 

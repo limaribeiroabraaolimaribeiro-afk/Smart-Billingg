@@ -1,0 +1,12 @@
+# Segredos locais — nunca versionar
+smart-billing-agent/.env
+smart-billing-agent/.wwebjs_auth/
+smart-billing-agent/.wwebjs_cache/
+
+# Dependências
+node_modules/
+smart-billing-agent/node_modules/
+
+# Sistema / editor
+.DS_Store
+Thumbs.db

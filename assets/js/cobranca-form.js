@@ -248,11 +248,33 @@
         }
       }
 
-      if (els.sendWhatsapp.checked) {
-        SB_UI.toast({ type: 'success', title: 'Cobrança enviada pelo WhatsApp', desc: `Link de pagamento enviado para ${currentClientLabel()}.` });
+      if (els.sendWhatsapp.checked && !isEdit) {
+        try {
+          if (saved?.cliente?.whatsapp) {
+            const empresaAtual = await DB.empresa.get().catch(() => null);
+            const message = SB_WA.chargeMessage(saved, empresaAtual?.nome || 'Smart Billing');
+            const result = await DB.whatsapp.enqueue({
+              messageType: 'charge',
+              message,
+              chargeId: saved.id,
+              clientId: saved.clienteId,
+              idempotencyKey: `charge:${saved.id}:create`,
+            });
+            if (result?.success) {
+              SB_UI.toast({ type: 'success', title: 'Cobrança adicionada à fila do WhatsApp', desc: 'Será enviada quando o agente estiver conectado.' });
+            } else {
+              SB_UI.toast({ type: 'error', title: 'Não foi possível enfileirar o WhatsApp', desc: result?.message || 'Você pode reenviar em Cobranças.' });
+            }
+          } else {
+            SB_UI.toast({ type: 'error', title: 'Cliente sem WhatsApp cadastrado', desc: 'A cobrança foi criada, mas não pôde ser enviada pelo WhatsApp.' });
+          }
+        } catch (err) {
+          console.error('[Smart Billing] Falha ao enfileirar cobrança no WhatsApp:', err);
+          SB_UI.toast({ type: 'error', title: 'Não foi possível enfileirar o WhatsApp', desc: 'Você pode reenviar em Cobranças.' });
+        }
       }
       if (els.sendEmail.checked) {
-        SB_UI.toast({ type: 'success', title: 'Cobrança enviada por e-mail' });
+        SB_UI.toast({ type: 'info', title: 'Envio de cobrança por e-mail ainda não disponível', desc: 'Use "Enviar por e-mail" nos recibos após a confirmação do pagamento.' });
       }
 
       setTimeout(() => { window.location.href = 'cobrancas.html'; }, 700);

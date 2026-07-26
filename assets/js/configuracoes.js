@@ -23,6 +23,74 @@
     empresa = null;
   }
 
+  // ---------------- Agente de WhatsApp (Configurações → WhatsApp) ----------------
+  let waState = null;
+  let waSettings = null;
+  let waHistory = [];
+  let waPollTimer = null;
+
+  const WA_STATUS_META = {
+    offline: { label: 'Agente desconectado', tone: 'pending' },
+    starting: { label: 'Iniciando...', tone: 'pending' },
+    qr_required: { label: 'Aguardando leitura do QR Code', tone: 'pending' },
+    authenticated: { label: 'Autenticando...', tone: 'pending' },
+    ready: { label: 'WhatsApp conectado', tone: 'paid' },
+    disconnected: { label: 'Desconectado', tone: 'overdue' },
+    error: { label: 'Erro na conexão', tone: 'overdue' },
+  };
+  const WA_JOB_LABEL = { pending: 'Na fila', processing: 'Enviando', sent: 'Enviado', failed: 'Falhou', cancelled: 'Cancelado' };
+  const WA_JOB_TONE = { pending: 'pending', processing: 'pending', sent: 'paid', failed: 'overdue', cancelled: 'canceled' };
+  const WA_TYPE_LABEL = { charge: 'Cobrança', overdue_reminder: 'Lembrete (atraso)', due_soon_reminder: 'Lembrete', receipt: 'Recibo', test: 'Teste', custom: 'Mensagem' };
+
+  function waAgentBaseUrl() {
+    const port = localStorage.getItem('sb_wa_agent_port') || '3210';
+    return `http://127.0.0.1:${port}`;
+  }
+
+  // Chama o agente local diretamente do navegador (só funciona quando esta
+  // página está aberta no MESMO computador onde o agente está rodando — é
+  // uma limitação inerente de um agente 100% local). Timeout curto para não
+  // travar a UI quando o agente não está acessível.
+  async function callLocalAgent(path, options = {}) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    try {
+      const res = await fetch(`${waAgentBaseUrl()}${path}`, { ...options, signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error(`O agente respondeu com erro (${res.status}).`);
+      return await res.json().catch(() => ({}));
+    } catch (err) {
+      clearTimeout(timeout);
+      throw new Error('Não foi possível falar com o agente local neste computador. Abra o agente e tente novamente.');
+    }
+  }
+
+  async function loadWhatsappData() {
+    try { waState = await DB.whatsapp.getAgentState(); } catch (err) { waState = null; }
+    try { waSettings = await DB.whatsapp.getSettings(); } catch (err) { waSettings = null; }
+    try { waHistory = await DB.whatsapp.history({ limit: 8 }); } catch (err) { waHistory = []; }
+  }
+
+  function stopWaPolling() {
+    if (waPollTimer) { clearInterval(waPollTimer); waPollTimer = null; }
+  }
+
+  // Atualiza status/QR/histórico a cada 3s enquanto a aba WhatsApp está
+  // aberta, para que o QR apareça e o status "conectado" atualize sozinho
+  // sem o usuário precisar recarregar a página.
+  function startWaPolling() {
+    stopWaPolling();
+    waPollTimer = setInterval(async () => {
+      if (!menu.querySelector('[data-section="whatsapp"]')?.classList.contains('is-active')) {
+        stopWaPolling();
+        return;
+      }
+      await loadWhatsappData();
+      content.innerHTML = sectionWhatsapp();
+      wireWhatsappButtons();
+    }, 3000);
+  }
+
   function fieldRow(label, value) {
     return `<div class="field"><label>${label}</label><input class="input" value="${SB_UI.escapeHtml(value || '')}" /></div>`;
   }
@@ -37,10 +105,17 @@
           ${fieldRow('Nome completo', empresa.admin.nome).replace('<input', '<input id="perfil-nome"')}
           ${fieldRow('Cargo', empresa.admin.cargo).replace('<input', `<input id="perfil-cargo" ${window.SMART_BILLING_CONFIG?.useDemoMode ? '' : 'disabled title="O cargo é definido pela sua função na empresa e não pode ser editado aqui."'}`)}
         </div>
-        <div class="field" style="margin-top:16px;">
-          <label>E-mail de acesso</label>
-          <input class="input" id="perfil-email" type="email" value="${SB_UI.escapeHtml(empresa.admin.email)}" />
+        <div class="field-row" style="margin-top:16px;">
+          <div class="field">
+            <label>E-mail de acesso</label>
+            <input class="input" id="perfil-email" type="email" value="${SB_UI.escapeHtml(empresa.admin.email)}" />
+          </div>
+          <div class="field">
+            <label>WhatsApp</label>
+            <input class="input" id="perfil-telefone" placeholder="(47) 99999-9999" value="${SB_UI.escapeHtml(empresa.admin.telefone || '')}" />
+          </div>
         </div>
+        <p class="field-hint" style="margin-top:10px;">Usado para receber a "mensagem de teste" do agente de WhatsApp, em Configurações → WhatsApp.</p>
         <button type="submit" class="btn btn-primary" style="margin-top:20px;">Salvar alterações</button>
       </form>`;
   }
@@ -207,6 +282,209 @@
       </div>`;
   }
 
+  function sectionWhatsapp() {
+    const st = waState;
+    const meta = WA_STATUS_META[st?.status] || WA_STATUS_META.offline;
+    const isReady = st?.status === 'ready';
+    const hasQr = st?.status === 'qr_required' && st?.qrCode;
+    const needsAttention = !st || ['offline', 'disconnected', 'error'].includes(st.status);
+    const lastSeenLabel = st?.lastSeenAt ? SB_UI.formatDateTime(st.lastSeenAt) : '—';
+
+    return `
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div class="card card-pad">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+            <div>
+              <div class="card-header__title" style="margin-bottom:4px;">Agente local de WhatsApp</div>
+              <div class="card-header__subtitle">Conecte o WhatsApp do seu celular para enviar cobranças, lembretes e recibos automaticamente.</div>
+            </div>
+            <span class="badge badge-${meta.tone}">${meta.label}</span>
+          </div>
+
+          ${isReady ? `
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+              <div class="summary-row"><span class="label">Número conectado</span><span class="value">${SB_UI.escapeHtml(st.phoneNumber || '—')}</span></div>
+              <div class="summary-row"><span class="label">Nome no WhatsApp</span><span class="value">${SB_UI.escapeHtml(st.displayName || '—')}</span></div>
+              <div class="summary-row"><span class="label">Última atividade</span><span class="value">${lastSeenLabel}</span></div>
+            </div>` : ''}
+
+          ${hasQr ? `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:16px;">
+              <img src="${st.qrCode}" alt="QR Code do WhatsApp" style="width:220px;height:220px;border-radius:12px;border:1px solid var(--border-subtle, #e5e7eb);" />
+              <p class="field-hint">No celular: WhatsApp → Aparelhos conectados → Conectar aparelho, e escaneie o código acima.</p>
+            </div>` : ''}
+
+          ${needsAttention ? `
+            <div class="auth-banner" style="margin-bottom:16px;">
+              ${SB_ICON.alertTriangle}
+              <span>${st?.status === 'error' && st?.errorMessage ? SB_UI.escapeHtml(st.errorMessage) : 'O agente local precisa estar aberto no seu computador para conectar o WhatsApp.'}</span>
+            </div>` : ''}
+
+          <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            <button class="btn btn-primary btn-sm" id="wa-btn-connect">${SB_ICON.whatsapp}<span>Conectar WhatsApp</span></button>
+            <button class="btn btn-secondary btn-sm" id="wa-btn-new-qr">${SB_ICON.refreshCw}<span>Gerar novo QR Code</span></button>
+            <button class="btn btn-secondary btn-sm" id="wa-btn-reconnect">${SB_ICON.refreshCw}<span>Reconectar</span></button>
+            <button class="btn btn-danger-ghost btn-sm" id="wa-btn-logout">${SB_ICON.ban}<span>Desconectar do zero</span></button>
+            <button class="btn btn-secondary btn-sm" id="wa-btn-test">${SB_ICON.mail}<span>Enviar mensagem de teste</span></button>
+            <button class="btn btn-secondary btn-sm" id="wa-btn-open-local">${SB_ICON.externalLink}<span>Abrir agente local</span></button>
+          </div>
+          <div class="field" style="margin-top:14px;max-width:220px;">
+            <label>Porta do agente local</label>
+            <input class="input" id="wa-agent-port" value="${SB_UI.escapeHtml(localStorage.getItem('sb_wa_agent_port') || '3210')}" />
+          </div>
+          <p class="field-hint" style="margin-top:10px;">Os botões acima falam diretamente com o agente em http://127.0.0.1 — só funcionam neste computador, com o agente aberto.</p>
+        </div>
+
+        <div class="card card-pad">
+          <div class="card-header__title" style="margin-bottom:4px;">Envio automático</div>
+          <div class="card-header__subtitle" style="margin-bottom:16px;">Escolha quando o Smart Billing deve enfileirar mensagens automaticamente pelo WhatsApp</div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <label class="checkbox-row"><input type="checkbox" data-wa-pref="sendChargeOnCreate" ${waSettings?.sendChargeOnCreate ? 'checked' : ''} /><span><span class="checkbox-row__label">Enviar cobrança ao criar</span><br/><span class="checkbox-row__desc">Complementa a caixa "Notificar cliente" do formulário de nova cobrança</span></span></label>
+            <label class="checkbox-row"><input type="checkbox" data-wa-pref="sendReceiptOnPayment" ${waSettings?.sendReceiptOnPayment ? 'checked' : ''} /><span><span class="checkbox-row__label">Enviar recibo ao confirmar pagamento</span><br/><span class="checkbox-row__desc">Envia automaticamente ao marcar uma cobrança como paga</span></span></label>
+            <label class="checkbox-row"><input type="checkbox" data-wa-pref="remind3DaysBefore" ${waSettings?.remind3DaysBefore ? 'checked' : ''} /><span><span class="checkbox-row__label">Lembrete 3 dias antes do vencimento</span></span></label>
+            <label class="checkbox-row"><input type="checkbox" data-wa-pref="remind1DayBefore" ${waSettings?.remind1DayBefore ? 'checked' : ''} /><span><span class="checkbox-row__label">Lembrete 1 dia antes do vencimento</span></span></label>
+            <label class="checkbox-row"><input type="checkbox" data-wa-pref="remindOnDueDate" ${waSettings?.remindOnDueDate ? 'checked' : ''} /><span><span class="checkbox-row__label">Lembrete no dia do vencimento</span></span></label>
+            <label class="checkbox-row"><input type="checkbox" data-wa-pref="remindWhenOverdue" ${waSettings?.remindWhenOverdue ? 'checked' : ''} /><span><span class="checkbox-row__label">Lembrete após atraso</span></span></label>
+          </div>
+          <p class="field-hint" style="margin-top:14px;">Os lembretes por data ficam salvos aqui, mas nesta versão ainda dependem de um disparo manual — use "Enviar lembrete" no menu de cada cobrança em Cobranças.</p>
+        </div>
+
+        <div class="card card-pad">
+          <div class="card-header__title" style="margin-bottom:4px;">Histórico recente</div>
+          <div class="card-header__subtitle" style="margin-bottom:16px;">Últimas mensagens enfileiradas pelo painel</div>
+          ${waHistory.length === 0 ? `
+            <div class="state-block">
+              <div class="state-block__icon">${SB_ICON.whatsapp}</div>
+              <div class="state-block__title">Nenhuma mensagem enviada ainda</div>
+              <p class="state-block__desc">Envie uma cobrança, um recibo ou uma mensagem de teste para ver o histórico aqui.</p>
+            </div>` : `
+            <div class="table-wrap">
+              <table class="table">
+                <thead><tr><th>Tipo</th><th>Destinatário</th><th>Status</th><th>Quando</th></tr></thead>
+                <tbody>
+                  ${waHistory.map((h) => `
+                    <tr>
+                      <td class="table-cell-muted">${WA_TYPE_LABEL[h.messageType] || h.messageType}</td>
+                      <td>${SB_UI.escapeHtml(h.recipient)}</td>
+                      <td><span class="badge badge-${WA_JOB_TONE[h.status] || 'pending'}">${WA_JOB_LABEL[h.status] || h.status}</span></td>
+                      <td class="table-cell-muted">${SB_UI.formatDateTime(h.createdAt)}</td>
+                    </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>`}
+        </div>
+      </div>`;
+  }
+
+  function wireWhatsappButtons() {
+    document.getElementById('wa-agent-port')?.addEventListener('change', (e) => {
+      localStorage.setItem('sb_wa_agent_port', e.target.value.trim() || '3210');
+    });
+
+    document.getElementById('wa-btn-open-local')?.addEventListener('click', () => {
+      window.open(waAgentBaseUrl(), '_blank');
+    });
+
+    async function refreshAfterAction() {
+      await loadWhatsappData();
+      content.innerHTML = sectionWhatsapp();
+      wireWhatsappButtons();
+    }
+
+    document.getElementById('wa-btn-connect')?.addEventListener('click', async () => {
+      try {
+        await callLocalAgent('/start', { method: 'POST' });
+        SB_UI.toast({ type: 'info', title: 'Solicitação enviada ao agente', desc: 'Aguardando QR Code...' });
+      } catch (err) {
+        SB_UI.toast({ type: 'error', title: 'Agente local não encontrado', desc: err.message });
+      }
+      await refreshAfterAction();
+    });
+
+    document.getElementById('wa-btn-new-qr')?.addEventListener('click', async () => {
+      const ok = await SB_UI.confirmDialog({
+        title: 'Gerar novo QR Code',
+        desc: 'Isso encerra a sessão atual do WhatsApp neste agente e gera um novo código para escanear. Continuar?',
+        confirmLabel: 'Gerar novo QR',
+        cancelLabel: 'Cancelar',
+        tone: 'warn',
+      });
+      if (!ok) return;
+      try {
+        await callLocalAgent('/restart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ forceNewQR: true }) });
+        SB_UI.toast({ type: 'info', title: 'Gerando novo QR Code...' });
+      } catch (err) {
+        SB_UI.toast({ type: 'error', title: 'Agente local não encontrado', desc: err.message });
+      }
+      await refreshAfterAction();
+    });
+
+    document.getElementById('wa-btn-reconnect')?.addEventListener('click', async () => {
+      try {
+        await callLocalAgent('/restart', { method: 'POST' });
+        SB_UI.toast({ type: 'info', title: 'Reconectando...' });
+      } catch (err) {
+        SB_UI.toast({ type: 'error', title: 'Agente local não encontrado', desc: err.message });
+      }
+      await refreshAfterAction();
+    });
+
+    document.getElementById('wa-btn-logout')?.addEventListener('click', async () => {
+      const ok = await SB_UI.confirmDialog({
+        title: 'Desconectar do zero',
+        desc: 'Isso encerra a sessão do WhatsApp deste agente e apaga a conexão salva (só a sessão do Smart Billing). Você precisará escanear um novo QR Code para reconectar. Continuar?',
+        confirmLabel: 'Desconectar',
+        cancelLabel: 'Cancelar',
+        tone: 'danger',
+      });
+      if (!ok) return;
+      try {
+        await callLocalAgent('/logout', { method: 'POST' });
+        SB_UI.toast({ type: 'success', title: 'Sessão encerrada' });
+      } catch (err) {
+        SB_UI.toast({ type: 'error', title: 'Agente local não encontrado', desc: err.message });
+      }
+      await refreshAfterAction();
+    });
+
+    document.getElementById('wa-btn-test')?.addEventListener('click', async () => {
+      const btn = document.getElementById('wa-btn-test');
+      btn.disabled = true;
+      try {
+        const result = await DB.whatsapp.enqueue({
+          messageType: 'test',
+          message: 'Mensagem de teste do Smart Billing ✅\n\nSe você recebeu isso, o agente de WhatsApp está funcionando corretamente.',
+          idempotencyKey: `test:${Date.now()}`,
+        });
+        if (result?.success) {
+          SB_UI.toast({ type: 'success', title: 'Mensagem de teste adicionada à fila', desc: 'Será enviada quando o WhatsApp estiver conectado.' });
+        } else {
+          SB_UI.toast({ type: 'error', title: 'Não foi possível enviar o teste', desc: result?.message || 'Cadastre seu WhatsApp em Perfil.' });
+        }
+      } catch (err) {
+        SB_UI.toast({ type: 'error', title: 'Não foi possível enviar o teste', desc: 'Tente novamente em instantes.' });
+      } finally {
+        btn.disabled = false;
+      }
+      await refreshAfterAction();
+    });
+
+    content.querySelectorAll('[data-wa-pref]').forEach((el) => {
+      el.addEventListener('change', async () => {
+        el.disabled = true;
+        try {
+          waSettings = await DB.whatsapp.updateSettings({ [el.dataset.waPref]: el.checked });
+          SB_UI.toast({ type: 'success', title: 'Preferência salva', duration: 2000 });
+        } catch (err) {
+          el.checked = !el.checked;
+          SB_UI.toast({ type: 'error', title: 'Não foi possível salvar', desc: 'Tente novamente.' });
+        } finally {
+          el.disabled = false;
+        }
+      });
+    });
+  }
+
   function errorBlock() {
     return `
       <div class="card card-pad">
@@ -222,6 +500,7 @@
     perfil: sectionPerfil,
     empresa: sectionEmpresa,
     integracoes: sectionIntegracoes,
+    whatsapp: sectionWhatsapp,
     notificacoes: sectionNotificacoes,
     seguranca: sectionSeguranca,
     dados: sectionDados,
@@ -318,6 +597,7 @@
           nome: document.getElementById('perfil-nome').value.trim(),
           cargo: document.getElementById('perfil-cargo').value.trim(),
           email: document.getElementById('perfil-email').value.trim(),
+          telefone: document.getElementById('perfil-telefone').value.trim(),
         };
         await DB.empresa.update({ admin: { ...empresa.admin, ...admin } });
         empresa.admin = { ...empresa.admin, ...admin };
@@ -379,6 +659,10 @@
     if (name === 'dados') {
       document.getElementById('btn-start-migration')?.addEventListener('click', runMigration);
     }
+    if (name === 'whatsapp') {
+      wireWhatsappButtons();
+      startWaPolling();
+    }
   }
 
   function render(name) {
@@ -386,12 +670,18 @@
     wireSection(name);
   }
 
-  menu.addEventListener('click', (e) => {
+  menu.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-section]');
     if (!btn) return;
     menu.querySelectorAll('.settings-menu-item').forEach((b) => b.classList.remove('is-active'));
     btn.classList.add('is-active');
-    render(btn.dataset.section);
+    const name = btn.dataset.section;
+    stopWaPolling();
+    if (name === 'whatsapp') {
+      content.innerHTML = '<div class="card card-pad"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div>';
+      await loadWhatsappData();
+    }
+    render(name);
   });
 
   render('perfil');

@@ -1,9 +1,10 @@
 # ============================================================================
 # Smart Billing — Configuração do Supabase CLI para as Edge Functions
 # ----------------------------------------------------------------------------
-# Não desativa a verificação de JWT globalmente: apenas as duas functions que
-# precisam ser chamadas sem sessão de usuário (webhook da InfinitePay e a
-# consulta pública de retorno do checkout) têm verify_jwt = false.
+# Não desativa a verificação de JWT globalmente: só têm verify_jwt = false as
+# functions chamadas sem sessão de usuário do Supabase — o webhook e a
+# consulta pública de retorno do checkout InfinitePay, e o agente local de
+# WhatsApp (que se autentica com seu próprio token, não com um JWT).
 # ============================================================================
 
 [functions.create-infinitepay-checkout]
@@ -17,3 +18,8 @@ verify_jwt = false
 
 [functions.send-receipt-email]
 verify_jwt = true
+
+# O agente local não tem sessão de usuário Supabase — autentica com o header
+# x-agent-token (WHATSAPP_AGENT_TOKEN), validado manualmente dentro da function.
+[functions.whatsapp-agent-api]
+verify_jwt = false
