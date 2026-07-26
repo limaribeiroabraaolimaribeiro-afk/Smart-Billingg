@@ -408,7 +408,21 @@ const DB = (() => {
           cliente: state.clientes.find((c) => c.id === r.clienteId) || null,
           cobranca: state.cobrancas.find((c) => c.id === r.cobrancaId) || null,
           pagamento: state.pagamentos.find((p) => p.id === r.pagamentoId) || null,
+          empresa: { nome: state.empresa?.nome },
         })));
+      },
+      obterCompleto(id) {
+        return delay(() => {
+          const r = state.recibos.find((x) => x.id === id);
+          if (!r) return null;
+          return {
+            ...r,
+            cliente: state.clientes.find((c) => c.id === r.clienteId) || null,
+            cobranca: state.cobrancas.find((c) => c.id === r.cobrancaId) || null,
+            pagamento: state.pagamentos.find((p) => p.id === r.pagamentoId) || null,
+            empresa: { nome: state.empresa?.nome },
+          };
+        });
       },
       getByPublicToken(token) {
         return delay(() => {
@@ -419,8 +433,17 @@ const DB = (() => {
             cliente: state.clientes.find((c) => c.id === r.clienteId) || null,
             cobranca: state.cobrancas.find((c) => c.id === r.cobrancaId) || null,
             pagamento: state.pagamentos.find((p) => p.id === r.pagamentoId) || null,
+            empresa: { nome: state.empresa?.nome },
           };
         });
+      },
+      // Sem serviço de e-mail real disponível em modo de demonstração.
+      sendEmail() {
+        return delay(() => ({
+          success: false,
+          code: 'EMAIL_SERVICE_NOT_CONFIGURED',
+          message: 'Envio de e-mail indisponível em modo de demonstração.',
+        }));
       },
     };
 
@@ -565,13 +588,20 @@ const DB = (() => {
         geradoEm: row.issued_at,
         cliente: row.charge?.client ? mapClient(row.charge.client) : null,
         cobranca: row.charge ? { codigo: row.charge.charge_number, descricao: row.charge.description } : null,
-        pagamento: row.payment ? { valor: Number(row.payment.gross_amount), forma: row.payment.payment_method } : null,
+        pagamento: row.payment ? {
+          valor: Number(row.payment.gross_amount),
+          forma: row.payment.payment_method,
+          parcelas: row.payment.installments,
+          dataHora: row.payment.paid_at,
+          codigoTransacao: row.payment.provider_transaction_id,
+        } : null,
+        empresa: row.company ? { nome: row.company.name } : null,
       };
     }
 
     const CHARGE_SELECT = '*, client:clients(id, name, whatsapp, email, document, notes, status, created_at, updated_at)';
     const PAYMENT_SELECT = '*, charge:charges(charge_number, client:clients(id, name, whatsapp, email))';
-    const RECEIPT_SELECT = '*, charge:charges(charge_number, description, client:clients(id, name, whatsapp, email)), payment:payments(gross_amount, payment_method, paid_at)';
+    const RECEIPT_SELECT = '*, company:companies(name), charge:charges(charge_number, description, client:clients(id, name, whatsapp, email)), payment:payments(gross_amount, payment_method, installments, paid_at, provider_transaction_id)';
 
     // ---------------- clientes ----------------
     const clientes = {
@@ -776,6 +806,30 @@ const DB = (() => {
         const companyId = await getCompanyId();
         const data = unwrap(await client.from('receipts').select(RECEIPT_SELECT).eq('company_id', companyId).order('issued_at', { ascending: false }));
         return data.map(mapReceipt);
+      },
+      async obterCompleto(id) {
+        const companyId = await getCompanyId();
+        const data = unwrap(await client.from('receipts').select(RECEIPT_SELECT).eq('company_id', companyId).eq('id', id).maybeSingle());
+        return mapReceipt(data);
+      },
+      // Chama a Edge Function send-receipt-email (autenticada). Todo o
+      // conteúdo do e-mail é montado no servidor a partir do receipt_id —
+      // o frontend nunca envia valor/cliente/descrição/destinatário.
+      async sendEmail(id) {
+        const { data, error } = await client.functions.invoke('send-receipt-email', {
+          body: { receipt_id: id },
+        });
+        if (error) {
+          let message = 'Não foi possível enviar o e-mail.';
+          let code = null;
+          try {
+            const body = await error.context?.json?.();
+            if (body?.message) message = body.message;
+            if (body?.code) code = body.code;
+          } catch (_) { /* mantém mensagem genérica */ }
+          return { success: false, message, code };
+        }
+        return { success: true, message: data?.message || 'Recibo enviado por e-mail' };
       },
       async getByPublicToken(token) {
         const data = unwrap(await client.rpc('get_public_receipt_by_token', { p_token: token }));

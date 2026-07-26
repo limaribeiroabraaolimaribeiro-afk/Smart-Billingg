@@ -111,6 +111,21 @@
       <div class="card-list">${rows.map(cardHtml).join('')}</div>`;
   }
 
+  function mailtoFallback(r) {
+    const email = r.cliente?.email;
+    if (!email) return;
+    const subject = `Recibo ${r.numero}`;
+    const body = [
+      `Olá ${r.cliente?.nome || ''},`,
+      '',
+      `Segue o recibo ${r.numero} referente ao pagamento de ${SB_UI.formatCurrency(r.pagamento?.valor || 0)}.`,
+      r.cobranca?.descricao ? `Descrição: ${r.cobranca.descricao}` : null,
+      '',
+      `Visualize o recibo em: ${receiptUrl(r)}`,
+    ].filter((line) => line !== null).join('\n');
+    window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
   listRegion.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
@@ -118,15 +133,82 @@
     if (!r) return;
     const act = btn.dataset.act;
 
-    if (act === 'view') { window.open(receiptUrl(r), '_blank'); return; }
-    if (act === 'download') { SB_UI.toast({ type: 'success', title: 'Recibo baixado', desc: `${r.numero}.pdf` }); return; }
-    if (act === 'copy') { await SB_UI.copyToClipboard(receiptUrl(r)); SB_UI.toast({ type: 'success', title: 'Link copiado' }); return; }
+    if (act === 'view') { SB_UI.closeOpenMenu(); window.open(receiptUrl(r), '_blank'); return; }
+
+    if (act === 'download') {
+      SB_UI.closeOpenMenu();
+      if (btn.disabled) return;
+      btn.disabled = true;
+      SB_UI.toast({ type: 'info', title: 'Gerando PDF...' });
+      try {
+        await window.ReceiptPDF.download(r);
+        SB_UI.toast({ type: 'success', title: 'PDF baixado com sucesso', desc: `${r.numero}.pdf` });
+      } catch (err) {
+        console.error('[Smart Billing] Falha ao gerar PDF do recibo:', err);
+        SB_UI.toast({ type: 'error', title: 'Não foi possível gerar o PDF', desc: 'Tente novamente em instantes.' });
+      } finally {
+        btn.disabled = false;
+      }
+      return;
+    }
+
+    if (act === 'copy') {
+      SB_UI.closeOpenMenu();
+      await SB_UI.copyToClipboard(receiptUrl(r));
+      SB_UI.toast({ type: 'success', title: 'Link copiado' });
+      return;
+    }
+
     if (act === 'whatsapp') {
+      SB_UI.closeOpenMenu();
       const msg = `Olá ${r.cliente?.nome || ''}! Segue o recibo ${r.numero} referente ao pagamento de ${SB_UI.formatCurrency(r.pagamento?.valor || 0)}: ${receiptUrl(r)}`;
       window.open(SB_UI.whatsappLink(r.cliente?.whatsapp, msg), '_blank');
       return;
     }
-    if (act === 'email') { SB_UI.toast({ type: 'success', title: 'Recibo enviado por e-mail', desc: r.cliente?.email || '' }); }
+
+    if (act === 'email') {
+      SB_UI.closeOpenMenu();
+      if (btn.disabled) return;
+      const email = r.cliente?.email;
+      if (!email) {
+        SB_UI.toast({ type: 'error', title: 'Cliente sem e-mail cadastrado', desc: 'Cadastre um e-mail para este cliente antes de enviar.' });
+        return;
+      }
+      const ok = await SB_UI.confirmDialog({
+        title: 'Enviar recibo por e-mail',
+        desc: `Enviar o recibo ${r.numero} para ${email}?`,
+        confirmLabel: 'Enviar',
+        cancelLabel: 'Cancelar',
+        tone: 'warn',
+      });
+      if (!ok) return;
+
+      btn.disabled = true;
+      SB_UI.toast({ type: 'info', title: 'Enviando e-mail...' });
+      try {
+        const result = await DB.recibos.sendEmail(r.id);
+        if (result?.success) {
+          SB_UI.toast({ type: 'success', title: 'Recibo enviado por e-mail', desc: email });
+        } else if (result?.code === 'EMAIL_SERVICE_NOT_CONFIGURED') {
+          const openMail = await SB_UI.confirmDialog({
+            title: 'Serviço de e-mail não configurado',
+            desc: 'O envio automático ainda não está disponível. Deseja abrir seu aplicativo de e-mail para enviar manualmente?',
+            confirmLabel: 'Abrir e-mail',
+            cancelLabel: 'Fechar',
+            tone: 'warn',
+          });
+          if (openMail) mailtoFallback(r);
+        } else {
+          console.error('[Smart Billing] Falha ao enviar recibo por e-mail:', result?.message);
+          SB_UI.toast({ type: 'error', title: 'Não foi possível enviar o e-mail', desc: result?.message || 'Tente novamente em instantes.' });
+        }
+      } catch (err) {
+        console.error('[Smart Billing] Erro inesperado ao enviar recibo por e-mail:', err);
+        SB_UI.toast({ type: 'error', title: 'Não foi possível enviar o e-mail', desc: 'Tente novamente em instantes.' });
+      } finally {
+        btn.disabled = false;
+      }
+    }
   });
 
   try {

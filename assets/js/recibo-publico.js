@@ -62,8 +62,20 @@
       </div>
     `);
 
-    document.getElementById('btn-download-receipt').addEventListener('click', () => {
-      SB_UI.toast({ type: 'success', title: 'Download iniciado', desc: `${recibo.numero}.pdf` });
+    document.getElementById('btn-download-receipt').addEventListener('click', async (e) => {
+      const downloadBtn = e.currentTarget;
+      if (downloadBtn.disabled) return;
+      downloadBtn.disabled = true;
+      SB_UI.toast({ type: 'info', title: 'Gerando PDF...' });
+      try {
+        await window.ReceiptPDF.download(recibo);
+        SB_UI.toast({ type: 'success', title: 'PDF baixado com sucesso', desc: `${recibo.numero}.pdf` });
+      } catch (err) {
+        console.error('[Smart Billing] Falha ao gerar PDF do recibo:', err);
+        SB_UI.toast({ type: 'error', title: 'Não foi possível gerar o PDF', desc: 'Tente novamente em instantes.' });
+      } finally {
+        downloadBtn.disabled = false;
+      }
     });
   } catch (err) {
     renderState(`
