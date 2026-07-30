@@ -44,4 +44,12 @@ function normalizePhoneBR(raw) {
   return `55${ddd}${rest}`;
 }
 
-module.exports = { normalizePhoneBR, VALID_DDD };
+// Mascara um telefone para logs: mantém DDI+DDD e os 2 últimos dígitos,
+// oculta o resto. Nunca deve ir para o log um número completo.
+function maskPhoneBR(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (digits.length < 6) return '***';
+  return `${digits.slice(0, 4)}${'*'.repeat(digits.length - 6)}${digits.slice(-2)}`;
+}
+
+module.exports = { normalizePhoneBR, maskPhoneBR, VALID_DDD };

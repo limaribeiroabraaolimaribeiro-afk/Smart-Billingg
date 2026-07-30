@@ -15,7 +15,7 @@ const config = require('./config');
 const logger = require('./logger');
 const agentApi = require('./agentApi');
 const whatsapp = require('./whatsappService');
-const { normalizePhoneBR } = require('./phone');
+const { normalizePhoneBR, maskPhoneBR } = require('./phone');
 
 const SEND_DELAY_MS = 1500;
 
@@ -29,17 +29,17 @@ function sleep(ms) {
 async function processJob(job) {
   const normalized = normalizePhoneBR(job.recipient);
   if (!normalized) {
-    logger.warn(`[fila] Mensagem ${job.id}: número inválido ("${job.recipient}").`);
+    logger.warn(`[fila] Mensagem ${job.id}: número inválido (${maskPhoneBR(job.recipient)}).`);
     await agentApi.acknowledgeFailed(job.id, 'Número de WhatsApp inválido.');
     return;
   }
 
   try {
     const whatsappMessageId = await whatsapp.sendMessage(normalized, job.message);
-    logger.info(`[fila] Mensagem ${job.id} (${job.message_type}) enviada para ${normalized}.`);
+    logger.info(`[fila] Mensagem ${job.id} (${job.message_type}) enviada para ${maskPhoneBR(normalized)}.`);
     await agentApi.acknowledgeSent(job.id, whatsappMessageId);
   } catch (err) {
-    logger.error(`[fila] Falha ao enviar mensagem ${job.id}:`, err.message);
+    logger.error(`[fila] Falha ao enviar mensagem ${job.id} (${maskPhoneBR(normalized)}):`, err.message);
     await agentApi.acknowledgeFailed(job.id, err.message || 'Falha desconhecida ao enviar.');
   }
 }

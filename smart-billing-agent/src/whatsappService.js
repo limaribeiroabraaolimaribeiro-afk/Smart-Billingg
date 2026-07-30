@@ -19,9 +19,32 @@ const fs = require('fs');
 const qrcode = require('qrcode');
 const qrcodeTerminal = require('qrcode-terminal');
 const logger = require('./logger');
+const { maskPhoneBR } = require('./phone');
 
 const SESSION_ROOT = path.join(__dirname, '..', '.wwebjs_auth');
 const CLIENT_ID = 'smart-billing';
+
+// Alguns contatos foram migrados pelo WhatsApp para identificadores @lid; nesses
+// casos o envio para o @c.us "clássico" falha com um destes erros específicos,
+// recuperáveis re-resolvendo o numberId.
+const LID_ERROR_PATTERNS = [/lid is missing in chat table/i, /no lid for user/i];
+
+function isLidRelatedError(err) {
+  const msg = err?.message || '';
+  return LID_ERROR_PATTERNS.some((re) => re.test(msg));
+}
+
+// numberId pode vir como objeto serializável, como {id: {...}} ou já como
+// string, dependendo da versão da lib — nunca forçamos @c.us aqui.
+function resolveChatId(numberId) {
+  return numberId?._serialized || numberId?.id?._serialized || String(numberId);
+}
+
+function idSuffix(chatId) {
+  if (typeof chatId === 'string' && chatId.endsWith('@c.us')) return '...@c.us';
+  if (typeof chatId === 'string' && chatId.endsWith('@lid')) return '...@lid';
+  return '(formato desconhecido)';
+}
 
 class WhatsAppService extends EventEmitter {
   constructor() {
@@ -155,17 +178,65 @@ class WhatsAppService extends EventEmitter {
     }
   }
 
+  // Tenta client.sendMessage(chatId, ...) e, se falhar, cai para buscar o
+  // chat pelo id resolvido e enviar por ele — cobre casos em que o envio
+  // direto não reconhece o identificador @lid.
+  async _attemptDelivery(chatId, text) {
+    try {
+      const sent = await this.client.sendMessage(chatId, text);
+      return sent?.id?._serialized || null;
+    } catch (primaryErr) {
+      try {
+        const chat = await this.client.getChatById(chatId);
+        const sent = await chat.sendMessage(text);
+        return sent?.id?._serialized || null;
+      } catch (fallbackErr) {
+        throw isLidRelatedError(primaryErr) ? primaryErr : fallbackErr;
+      }
+    }
+  }
+
   // phoneE164 = "5547999999999" (sem "+"), já normalizado por phone.js.
   async sendMessage(phoneE164, text) {
     if (!this.client || this.status !== 'ready') {
       throw new Error('WhatsApp não conectado');
     }
+
+    const maskedPhone = maskPhoneBR(phoneE164);
+
     const numberId = await this.client.getNumberId(phoneE164);
     if (!numberId) {
-      throw new Error('Este número não possui WhatsApp');
+      throw new Error('O número informado não possui WhatsApp.');
     }
-    const sent = await this.client.sendMessage(numberId._serialized, text);
-    return sent?.id?._serialized || null;
+    let chatId = resolveChatId(numberId);
+
+    try {
+      logger.info(`[whatsapp] Enviando para ${maskedPhone} (id ${idSuffix(chatId)}) — tentativa inicial.`);
+      return await this._attemptDelivery(chatId, text);
+    } catch (err) {
+      if (!isLidRelatedError(err)) {
+        logger.error(`[whatsapp] Falha ao enviar para ${maskedPhone} (id ${idSuffix(chatId)}) — tentativa inicial: ${err.message}`);
+        throw err;
+      }
+
+      // Recuperação: apenas para erros de LID, e apenas uma vez — resolve o
+      // numberId de novo e repete o envio com o novo id, sem duplicar.
+      logger.warn(`[whatsapp] Erro de LID para ${maskedPhone} (id ${idSuffix(chatId)}) — tentativa inicial: ${err.message}. Tentando recuperar.`);
+
+      const retryNumberId = await this.client.getNumberId(phoneE164);
+      if (!retryNumberId) {
+        throw new Error('O número informado não possui WhatsApp.');
+      }
+      chatId = resolveChatId(retryNumberId);
+
+      try {
+        logger.info(`[whatsapp] Reenviando para ${maskedPhone} (id ${idSuffix(chatId)}) — retry.`);
+        return await this._attemptDelivery(chatId, text);
+      } catch (retryErr) {
+        logger.error(`[whatsapp] Falha ao enviar para ${maskedPhone} (id ${idSuffix(chatId)}) — retry: ${retryErr.message}`);
+        throw retryErr;
+      }
+    }
   }
 
   getSnapshot() {
