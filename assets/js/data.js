@@ -267,7 +267,14 @@ const DB = (() => {
       },
       remove(id) {
         return delay(() => {
+          // Espelha o "on delete cascade" do banco real: excluir o cliente
+          // remove também suas cobranças e, em cascata, os pagamentos/recibos
+          // ligados a essas cobranças — nada fica órfão como "Cliente removido".
+          const cobrancaIds = new Set(state.cobrancas.filter((c) => c.clienteId === id).map((c) => c.id));
           state.clientes = state.clientes.filter((c) => c.id !== id);
+          state.cobrancas = state.cobrancas.filter((c) => c.clienteId !== id);
+          state.pagamentos = state.pagamentos.filter((p) => !cobrancaIds.has(p.cobrancaId));
+          state.recibos = state.recibos.filter((r) => !cobrancaIds.has(r.cobrancaId));
           persist();
           return true;
         });

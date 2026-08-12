@@ -134,7 +134,11 @@ comment on table public.clients is 'Clientes de uma empresa, usados para emitir 
 create table if not exists public.charges (
   id                  uuid primary key default gen_random_uuid(),
   company_id          uuid not null references public.companies (id) on delete cascade,
-  client_id           uuid references public.clients (id) on delete set null,
+  -- on delete cascade: excluir um cliente remove permanentemente todas as
+  -- suas cobranças (e, em cascata, os pagamentos/recibos ligados a elas —
+  -- veja payments.charge_id e receipts.charge_id/payment_id abaixo). Isso
+  -- evita cobranças "órfãs" exibidas como "Cliente removido" na interface.
+  client_id           uuid references public.clients (id) on delete cascade,
   charge_number       text unique,
   description         text not null,
   amount              numeric(12, 2) not null check (amount > 0),
