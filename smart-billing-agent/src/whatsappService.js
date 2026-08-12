@@ -163,6 +163,16 @@ class WhatsAppService extends EventEmitter {
     this._setStatus('offline');
   }
 
+  // Encerramento gracioso (SIGTERM/SIGINT/pm2 restart): fecha o Chromium de
+  // forma limpa SEM apagar a sessão salva (diferente de logout(), que apaga
+  // de propósito) — na próxima inicialização, a mesma sessão é reaproveitada
+  // sem pedir novo QR Code.
+  async shutdown() {
+    await this._destroyClient();
+    this._starting = false;
+    this._setStatus('offline');
+  }
+
   async _destroyClient() {
     if (!this.client) return;
     try { await this.client.destroy(); } catch (_) { /* ignora — já pode estar encerrado */ }

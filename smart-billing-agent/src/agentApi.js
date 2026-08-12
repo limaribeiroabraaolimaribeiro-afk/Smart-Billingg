@@ -45,4 +45,16 @@ module.exports = {
   claimJobs: (limit = 5) => call('claim_jobs', { limit }),
   acknowledgeSent: (id, whatsappMessageId) => call('acknowledge_sent', { id, whatsapp_message_id: whatsappMessageId || undefined }),
   acknowledgeFailed: (id, errorMessage) => call('acknowledge_failed', { id, error_message: errorMessage }),
+
+  // ---- Cobrança automática (scheduler) ----
+  // Todas passam pela mesma Edge Function whatsapp-agent-api, com o mesmo
+  // token compartilhado — o worker nunca guarda a service_role key nem a
+  // chave do Resend; ambas ficam só nos secrets do Supabase.
+  listReminderCandidates: () => call('list_reminder_candidates'),
+  enqueueReminder: ({ chargeId, messageType, message, idempotencyKey }) => call('enqueue_reminder', {
+    charge_id: chargeId, message_type: messageType, message, idempotency_key: idempotencyKey,
+  }),
+  sendEmailReminder: ({ chargeId, kind, idempotencyKey }) => call('send_email_reminder', {
+    charge_id: chargeId, kind, idempotency_key: idempotencyKey,
+  }),
 };

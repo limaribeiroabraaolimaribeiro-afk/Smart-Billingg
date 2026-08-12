@@ -16,6 +16,7 @@ const config = require('./config');
 const logger = require('./logger');
 const whatsapp = require('./whatsappService');
 const agentApi = require('./agentApi');
+const scheduler = require('./scheduler');
 const { normalizePhoneBR } = require('./phone');
 const pkg = require('../package.json');
 
@@ -46,8 +47,19 @@ function createServer() {
   app.use(express.json());
   app.use(express.static(path.join(__dirname, '..', 'public')));
 
+  // Health check local — só escuta em 127.0.0.1 (ver index.js), pensado para
+  // ser checado via SSH/firewall/reverse proxy, nunca exposto publicamente
+  // sem autenticação. Não expõe nenhum dado de cliente/cobrança — apenas o
+  // estado operacional dos serviços internos.
   app.get('/health', (req, res) => {
-    res.json({ ok: true, name: pkg.name, version: pkg.version });
+    res.json({
+      status: 'ok',
+      name: pkg.name,
+      version: pkg.version,
+      worker: 'running',
+      scheduler: scheduler.isRunning() ? 'running' : 'stopped',
+      whatsapp: whatsapp.status,
+    });
   });
 
   app.get('/status', (req, res) => {

@@ -1,10 +1,18 @@
-# Smart Billing Agent — WhatsApp local (QR Code)
+# Smart Billing Agent / Worker — WhatsApp 24/7 + cobrança automática
 
-Agente Node.js local que conecta o WhatsApp do seu celular ao Smart Billing
-via QR Code (`whatsapp-web.js` + `LocalAuth`), para enviar cobranças,
-lembretes e recibos automaticamente. Roda no seu computador — o Supabase
-nunca executa `whatsapp-web.js` diretamente (Edge Functions não suportam um
-navegador headless).
+Agente/worker Node.js que conecta o WhatsApp via QR Code (`whatsapp-web.js` +
+`LocalAuth`) para enviar cobranças, lembretes e recibos automaticamente, e
+que agora também roda um **scheduler de cobrança automática** (WhatsApp +
+e-mail, reaproveitando as preferências já existentes em Configurações →
+WhatsApp). O Supabase nunca executa `whatsapp-web.js` diretamente (Edge
+Functions não suportam um navegador headless) — por isso este processo
+precisa ficar em algum lugar sempre ligado.
+
+Hoje isso pode ser o seu computador (Windows, via `start-agent.bat`, ver
+abaixo) ou, futuramente, uma VPS rodando 24/7 com PM2 — ver
+[`docs/VPS_SETUP.md`](../docs/VPS_SETUP.md) para o passo a passo de
+preparação (Ubuntu 24.04). O código é o mesmo nos dois casos; só muda onde
+o processo roda.
 
 Sessão salva em `./.wwebjs_auth/session-smart-billing`, **independente** de
 qualquer outra sessão de WhatsApp que você já use em outro projeto (ex.:
@@ -171,11 +179,23 @@ sessões de outro projeto.
   outro dispositivo, esses botões não alcançam o agente — mas o envio de
   mensagens pela fila continua funcionando normalmente (não depende do
   navegador estar aberto).
-- **Lembretes por data (3 dias antes, no vencimento, atraso) não têm
-  agendador automático nesta versão** — as preferências ficam salvas em
-  Configurações → WhatsApp, mas o disparo é manual (menu da cobrança →
-  "Enviar lembrete"). Automatizar por data exigiria um cron/scheduler
-  adicional, fora do escopo desta entrega.
+- **Lembretes por data (3 dias antes, 1 dia antes, no vencimento, atraso)
+  agora têm um scheduler automático** (`src/scheduler.js` + `src/billing.js`),
+  além do disparo manual (menu da cobrança → "Enviar lembrete") que
+  continua funcionando normalmente. O scheduler reaproveita as MESMAS
+  preferências de Configurações → WhatsApp — nenhuma regra nova de data foi
+  inventada. **Isso ainda depende de duas coisas que precisam ser aplicadas
+  manualmente antes de funcionar em produção:** rodar
+  `sql/vps_worker_automation.sql` no Supabase (cria a função de
+  enfileiramento do worker e o novo campo `email_reminders_enabled`) e
+  publicar a versão atualizada de `whatsapp-agent-api`
+  (`supabase functions deploy whatsapp-agent-api`). Até lá, o comportamento
+  atual (envio só manual) continua exatamente como está.
+- Envio de e-mail nos lembretes é opcional por empresa
+  (`email_reminders_enabled`, default desligado) e usa os mesmos secrets do
+  Resend já configurados para `send-receipt-email`
+  (`RESEND_API_KEY`/`EMAIL_FROM`/`PUBLIC_APP_URL`) — o worker nunca guarda
+  essa chave localmente.
 - **Não recebe nem responde mensagens** nesta primeira versão — só envia.
 - Primeira execução baixa o Chromium via Puppeteer (~200 MB) — precisa de
   internet na primeira vez.

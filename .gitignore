@@ -3,6 +3,15 @@ smart-billing-agent/.env
 smart-billing-agent/.wwebjs_auth/
 smart-billing-agent/.wwebjs_cache/
 
+# Defensivo: caso algum dia sessão/logs sejam gravados com outro nome dentro
+# do worker, nunca devem ir para o Git (a pasta atual de sessão real já é
+# .wwebjs_auth/ acima — estes cobrem nomes alternativos comuns).
+smart-billing-agent/session/
+smart-billing-agent/sessions/
+smart-billing-agent/auth/
+smart-billing-agent/logs/
+smart-billing-agent/*.log
+
 # Dependências
 node_modules/
 smart-billing-agent/node_modules/
