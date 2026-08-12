@@ -67,8 +67,14 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .card-pad { padding: var(--space-6); }
+@media (max-width: 480px) {
+  .card-pad { padding: var(--space-4); }
+}
 
 .card-header {
   display: flex;
@@ -86,6 +92,8 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: var(--space-5);
+  width: 100%;
+  min-width: 0;
 }
 
 .stat-card {
@@ -100,6 +108,9 @@
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
   position: relative;
   overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 
@@ -134,7 +145,13 @@
 .stat-card__trend svg { width: 12px; height: 12px; }
 
 .stat-card__label { font-size: 12.5px; color: var(--text-secondary); font-weight: 600; }
-.stat-card__value { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-top: 2px; }
+.stat-card__value {
+  font-size: clamp(18px, 5vw, 24px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+  white-space: nowrap;
+}
 .stat-card__count { font-size: 12px; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
 
 @media (max-width: 1280px) {
@@ -144,7 +161,20 @@
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 480px) {
-  .stat-grid { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: 1fr; gap: var(--space-4); }
+  .stat-card { padding: var(--space-4); }
+}
+
+/* Modifier for grids with exactly 3 stat cards (Relatórios, Pagamentos):
+   3 columns on desktop, 2 columns + full-width 3rd card on tablet, 1 column on mobile. */
+.stat-grid--3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 860px) {
+  .stat-grid--3 { grid-template-columns: repeat(2, 1fr); }
+  .stat-grid--3 > :nth-child(3) { grid-column: 1 / -1; }
+}
+@media (max-width: 480px) {
+  .stat-grid--3 { grid-template-columns: 1fr; }
+  .stat-grid--3 > :nth-child(3) { grid-column: auto; }
 }
 
 /* ---------- Badges / Status ---------- */
@@ -539,7 +569,7 @@
 }
 
 /* ---------- Section heading ---------- */
-.page-section { display: flex; flex-direction: column; gap: var(--space-6); }
+.page-section { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .section-head__title { font-size: 16px; font-weight: 800; }
 .section-head__desc { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }

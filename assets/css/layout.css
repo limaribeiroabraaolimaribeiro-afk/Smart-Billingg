@@ -287,10 +287,12 @@
 /* ---------- Content ---------- */
 .app-content {
   flex: 1;
+  min-width: 0;
   padding: var(--space-8);
   max-width: 1440px;
   width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 @media (max-width: 1024px) {
@@ -325,4 +327,9 @@
     border-radius: var(--radius-sm);
   }
   .topbar-right > .btn-primary span { display: none; }
+}
+
+@media (max-width: 360px) {
+  .app-content { padding: 12px; }
+  .topbar { padding: 0 12px; }
 }

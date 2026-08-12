@@ -6,6 +6,11 @@
 html, body {
   margin: 0;
   padding: 0;
+  /* Last-resort guard: the real overflow sources are fixed elsewhere
+     (min-width:0 on grid/flex items, responsive stat-grid, etc.) — this
+     just prevents any residual horizontal drag on the page. */
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 html { -webkit-text-size-adjust: 100%; }
