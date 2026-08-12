@@ -132,15 +132,15 @@
     const cliente = all.find((c) => c.id === btn.dataset.id);
     if (!cliente) return;
     const ok = await SB_UI.confirmDialog({
-      title: 'Excluir cliente',
-      desc: `Tem certeza que deseja excluir "${cliente.nome}"? As cobranças associadas permanecerão no histórico, mas o vínculo com o cliente será perdido.`,
+      title: `Excluir "${cliente.nome}"?`,
+      desc: 'Ao excluir este cliente, todas as cobranças, pagamentos e recibos relacionados também serão excluídos permanentemente. Esta ação não poderá ser desfeita.',
       confirmLabel: 'Excluir cliente',
       cancelLabel: 'Cancelar',
       tone: 'danger',
     });
     if (!ok) return;
     await DB.clientes.remove(cliente.id);
-    SB_UI.toast({ type: 'info', title: 'Cliente excluído', desc: `${cliente.nome} foi removido.` });
+    SB_UI.toast({ type: 'success', title: 'Cliente excluído', desc: `${cliente.nome} e todos os dados relacionados foram excluídos permanentemente.` });
     load();
   });
 
