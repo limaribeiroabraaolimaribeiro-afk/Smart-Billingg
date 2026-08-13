@@ -155,6 +155,17 @@ create trigger trg_whatsapp_settings_updated_at before update on public.whatsapp
 -- Usa FOR UPDATE SKIP LOCKED para que, mesmo com chamadas concorrentes, cada
 -- mensagem seja entregue a apenas uma execução. Restrita à service_role: só
 -- a Edge Function whatsapp-agent-api (nunca o navegador) pode chamá-la.
+--
+-- Antes de reivindicar, faz duas higienizações (necessárias para o worker
+-- de cobrança automática — ver sql/vps_worker_automation.sql para o
+-- histórico/justificativa completa):
+--   (a) cancela mensagens "pending" de tipo charge/due_soon_reminder/
+--       overdue_reminder cuja cobrança não está mais pendente (paga/
+--       cancelada) ou foi excluída (charge_id NULL);
+--   (b) marca como "failed" mensagens travadas em "processing" há mais de
+--       5 minutos (worker encerrado/travado no meio do envio) — nunca
+--       volta sozinha para "pending", para não arriscar duplicar uma
+--       mensagem que pode já ter sido entregue antes do crash.
 -- ============================================================================
 create or replace function public.claim_whatsapp_jobs(p_company_id uuid, p_limit integer default 5)
 returns setof public.whatsapp_outbox
@@ -163,6 +174,27 @@ security definer
 set search_path = public
 as $$
 begin
+  update public.whatsapp_outbox o
+  set status = 'cancelled',
+      error_message = 'Cobrança não está mais pendente (paga/cancelada/excluída) no momento do envio — lembrete cancelado automaticamente.',
+      updated_at = now()
+  where o.company_id = p_company_id
+    and o.status = 'pending'
+    and o.message_type in ('charge', 'due_soon_reminder', 'overdue_reminder')
+    and not exists (
+      select 1 from public.charges c
+      where c.id = o.charge_id and c.status = 'pending'
+    );
+
+  update public.whatsapp_outbox o
+  set status = 'failed',
+      failed_at = now(),
+      error_message = 'Reivindicado mas não confirmado dentro do tempo esperado (processo pode ter sido interrompido). Verifique manualmente se a mensagem já foi entregue antes de reenviar.',
+      updated_at = now()
+  where o.company_id = p_company_id
+    and o.status = 'processing'
+    and o.claimed_at < now() - interval '5 minutes';
+
   return query
   update public.whatsapp_outbox
   set status = 'processing',
@@ -182,7 +214,7 @@ begin
   returning *;
 end;
 $$;
-comment on function public.claim_whatsapp_jobs(uuid, integer) is 'Reivindica atomicamente até p_limit mensagens pendentes de uma empresa (FOR UPDATE SKIP LOCKED). Uso exclusivo da service_role (Edge Function whatsapp-agent-api).';
+comment on function public.claim_whatsapp_jobs(uuid, integer) is 'Reivindica atomicamente até p_limit mensagens pendentes de uma empresa (FOR UPDATE SKIP LOCKED). Antes disso, cancela lembretes cuja cobrança não está mais pendente/existe, e falha mensagens travadas em processing há mais de 5min. Uso exclusivo da service_role (Edge Function whatsapp-agent-api).';
 
 revoke all on function public.claim_whatsapp_jobs(uuid, integer) from public;
 revoke all on function public.claim_whatsapp_jobs(uuid, integer) from anon, authenticated;

@@ -396,10 +396,26 @@ Deno.serve(async (req: Request) => {
 
         const { data: charge, error: chargeErr } = await adminClient
           .from('charges')
-          .select('id, charge_number, description, amount, due_date, public_token, client:clients(name, email)')
+          .select('id, charge_number, description, amount, due_date, public_token, status, client:clients(name, email)')
           .eq('id', chargeId).eq('company_id', companyId).maybeSingle();
         if (chargeErr) throw chargeErr;
         if (!charge) return jsonResponse({ success: false, message: 'Cobrança não encontrada.' }, 404);
+
+        // Confirma de novo, agora, que a cobrança ainda está pendente — fecha
+        // a mesma janela de corrida do lado do WhatsApp (cliente pode ter
+        // pago entre o worker listar candidatos e chegar aqui).
+        if (charge.status !== 'pending') {
+          await adminClient.from('notification_logs').insert({
+            company_id: companyId,
+            charge_id: chargeId,
+            channel: 'email',
+            recipient: null,
+            status: 'skipped',
+            error_message: `Cobrança não está mais pendente (status atual: ${charge.status}).`,
+            idempotency_key: idempotencyKey,
+          }).select().maybeSingle();
+          return jsonResponse({ success: true, skipped: 'not_pending' });
+        }
 
         const client = charge.client as { name?: string; email?: string } | null;
         const recipientEmail = client?.email;
