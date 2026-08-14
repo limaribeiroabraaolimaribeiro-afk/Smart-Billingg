@@ -71,7 +71,7 @@ Deno.test('isValidInfinitePayCheckoutUrl aceita URL https do domínio .com.br', 
 });
 
 Deno.test('isValidInfinitePayCheckoutUrl aceita URL https do domínio .io (resposta real da API /links)', () => {
-  assertEquals(isValidInfinitePayCheckoutUrl('https://checkout.infinitepay.io/abraao-lima-ribeiro-720?lenc=abc'), true);
+  assertEquals(isValidInfinitePayCheckoutUrl('https://checkout.infinitepay.io/loja-exemplo-720?lenc=abc'), true);
 });
 
 Deno.test('isValidInfinitePayCheckoutUrl rejeita http (não https)', () => {

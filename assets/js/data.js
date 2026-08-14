@@ -214,7 +214,7 @@ const DB = (() => {
           cnpj: '32.145.678/0001-90',
           email: 'financeiro@smartbilling.com.br',
           telefone: '(11) 4000-1234',
-          admin: { nome: 'Abraão Ribeiro', email: 'limaribeiroabraaolimaribeiro@gmail.com', telefone: '', cargo: 'Administrador' },
+          admin: { nome: 'Administrador Demo', email: 'admin@example.com', telefone: '(11) 99999-9999', cargo: 'Administrador' },
         },
       };
     }
@@ -435,11 +435,15 @@ const DB = (() => {
         return delay(() => {
           const r = state.recibos.find((x) => x.publicToken === token);
           if (!r) return null;
+          const pagamentoInterno = state.pagamentos.find((p) => p.id === r.pagamentoId) || null;
+          // Espelha o comportamento do RPC público real (get_public_receipt_by_token):
+          // codigoTransacao é interno, nunca exposto ao token público.
+          const { codigoTransacao, ...pagamentoPublico } = pagamentoInterno || {};
           return {
             ...r,
             cliente: state.clientes.find((c) => c.id === r.clienteId) || null,
             cobranca: state.cobrancas.find((c) => c.id === r.cobrancaId) || null,
-            pagamento: state.pagamentos.find((p) => p.id === r.pagamentoId) || null,
+            pagamento: pagamentoInterno ? pagamentoPublico : null,
             empresa: { nome: state.empresa?.nome },
           };
         });
@@ -882,12 +886,14 @@ const DB = (() => {
           cobranca: { codigo: row.charge_number, descricao: row.description },
           cliente: { nome: row.client_name },
           empresaNome: row.company_name,
+          // Sem codigoTransacao: get_public_receipt_by_token (RPC pública) não
+          // retorna provider_transaction_id — esse dado é só para o painel
+          // autenticado (ver recibos.obterCompleto / recibos.list acima).
           pagamento: {
             forma: row.payment_method,
             parcelas: row.installments,
             valor: Number(row.gross_amount),
             dataHora: row.paid_at,
-            codigoTransacao: row.provider_transaction_id,
           },
         };
       },
