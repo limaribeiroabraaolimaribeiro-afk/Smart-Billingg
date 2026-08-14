@@ -26,7 +26,7 @@ async function tick() {
   logger.info('[SCHEDULER] ciclo iniciado');
   try {
     const summary = await billing.runCycle();
-    logger.info(`[SCHEDULER] ciclo finalizado — analisadas=${summary.analyzed} whatsapp=${summary.whatsappEnqueued} email=${summary.emailSent} erros=${summary.errors}`);
+    logger.info(`[SCHEDULER] ciclo finalizado — clientes=${summary.clientsAnalyzed} cobrancas=${summary.chargesAnalyzed} whatsapp=${summary.whatsappEnqueued} email=${summary.emailSent} erros=${summary.errors}`);
   } catch (err) {
     // Segurança extra: mesmo que billing.runCycle() já trate seus próprios
     // erros internamente, nunca deixa uma exceção aqui derrubar o processo.

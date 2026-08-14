@@ -48,4 +48,29 @@ function reminderMessage(kind, charge, clientName, companyName) {
   ].join('\n');
 }
 
-module.exports = { reminderMessage, publicChargeUrl };
+// Resumo diário consolidado — no máximo 1 mensagem automática por cliente
+// por dia (ver src/billing.js), mesmo que ele tenha várias cobranças
+// elegíveis. "charges" já vem ordenado por prioridade (mais urgente
+// primeiro) e com "label" pronto (calculado no servidor — ver
+// list_reminder_candidates), então este módulo só formata o texto.
+// charges: [{ id, charge_number, description, amount, due_date, public_token, kind, label }]
+function dailyDigestMessage(charges, clientName, companyName) {
+  const n = charges.length;
+  const linhas = charges.map((c) => `• ${c.charge_number} — ${formatCurrencyBRL(c.amount)} — ${c.label}`);
+  const links = charges.map((c) => publicChargeUrl(c));
+
+  return [
+    `Olá, ${clientName || 'cliente'}! ⏰`,
+    '',
+    n > 1 ? `Você possui ${n} cobranças pendentes:` : 'Você possui 1 cobrança pendente:',
+    '',
+    ...linhas,
+    '',
+    n > 1 ? 'Acesse os links abaixo para visualizar e pagar:' : 'Acesse o link abaixo para visualizar e pagar:',
+    ...links,
+    '',
+    `${companyName} · mensagem automática do Smart Billing.`,
+  ].join('\n');
+}
+
+module.exports = { reminderMessage, dailyDigestMessage, publicChargeUrl };

@@ -50,11 +50,17 @@ module.exports = {
   // Todas passam pela mesma Edge Function whatsapp-agent-api, com o mesmo
   // token compartilhado — o worker nunca guarda a service_role key nem a
   // chave do Resend; ambas ficam só nos secrets do Supabase.
+  //
+  // Nem enqueueDailyReminder nem sendDailyEmailReminder recebem uma
+  // idempotency_key daqui — ela é SEMPRE calculada dentro da Edge Function,
+  // a partir de company_id+client_id+dia local do SERVIDOR. Isso garante
+  // "no máximo 1 lembrete automático por cliente por dia" mesmo que este
+  // worker tenha algum bug de fuso horário ou de relógio local.
   listReminderCandidates: () => call('list_reminder_candidates'),
-  enqueueReminder: ({ chargeId, messageType, message, idempotencyKey }) => call('enqueue_reminder', {
-    charge_id: chargeId, message_type: messageType, message, idempotency_key: idempotencyKey,
+  enqueueDailyReminder: ({ clientId, chargeIds, message }) => call('enqueue_daily_reminder', {
+    client_id: clientId, charge_ids: chargeIds, message,
   }),
-  sendEmailReminder: ({ chargeId, kind, idempotencyKey }) => call('send_email_reminder', {
-    charge_id: chargeId, kind, idempotency_key: idempotencyKey,
+  sendDailyEmailReminder: ({ clientId, chargeIds }) => call('send_daily_email_reminder', {
+    client_id: clientId, charge_ids: chargeIds,
   }),
 };

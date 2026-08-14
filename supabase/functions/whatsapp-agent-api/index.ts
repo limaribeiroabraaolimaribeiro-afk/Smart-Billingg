@@ -21,28 +21,37 @@
 //   heartbeat          { company_id }
 //   logout_complete     { company_id }
 //
-// Ações do WORKER de cobrança automática (VPS) — ainda não usadas em
-// produção nesta etapa, preparadas para quando o worker for ligado:
+// Ações do WORKER de cobrança automática (VPS):
 //   list_reminder_candidates { company_id }
-//     -> cobranças pendentes que precisam de lembrete HOJE (America/Sao_Paulo),
-//        segundo whatsapp_settings (remind_3_days_before/remind_1_day_before/
-//        remind_on_due_date/remind_when_overdue) — mesmas regras já usadas
-//        pelo painel, nenhuma regra nova inventada aqui.
-//   enqueue_reminder { company_id, charge_id, message_type, message, idempotency_key }
-//     -> enfileira o lembrete de WhatsApp via enqueue_whatsapp_message_system()
-//        (RPC restrita a service_role — ver sql/vps_worker_automation.sql).
-//   send_email_reminder { company_id, charge_id, kind, idempotency_key }
-//     -> envia o lembrete por e-mail via Resend, com o mesmo padrão de
-//        idempotência (notification_logs.idempotency_key) e o mesmo modelo
-//        de composição de send-receipt-email (nunca aceita conteúdo do
-//        chamador — busca tudo do banco a partir de charge_id).
+//     -> AGRUPADO POR CLIENTE: no máximo 1 entrada por cliente, mesmo que
+//        ele tenha várias cobranças elegíveis para lembrete HOJE
+//        (America/Sao_Paulo), segundo whatsapp_settings
+//        (remind_3_days_before/remind_1_day_before/remind_on_due_date/
+//        remind_when_overdue) — mesmas regras já usadas pelo painel,
+//        nenhuma regra nova de DATA foi inventada; a única regra nova é
+//        "no máximo 1 mensagem automática por cliente por dia", que agrupa
+//        as cobranças desse cliente num único resumo.
+//   enqueue_daily_reminder { company_id, client_id, charge_ids[], message }
+//     -> enfileira o resumo diário de WhatsApp via
+//        enqueue_daily_reminder_system() (RPC restrita a service_role — ver
+//        sql/fix_daily_reminder_dedup.sql). A idempotency_key é SEMPRE
+//        calculada aqui, a partir de company_id+client_id+dia local do
+//        SERVIDOR — nunca aceita do worker, para garantir "no máximo 1 por
+//        cliente por dia" mesmo que o worker tenha algum bug de fuso.
+//   send_daily_email_reminder { company_id, client_id, charge_ids[] }
+//     -> envia o resumo diário por e-mail via Resend, com o mesmo padrão de
+//        idempotência (notification_logs.idempotency_key, também calculada
+//        aqui, nunca aceita do chamador) e o mesmo modelo de composição de
+//        send-receipt-email (nunca aceita conteúdo do chamador — busca tudo
+//        do banco a partir de client_id/charge_ids).
 //
 // Secrets exigidos (supabase secrets set):
 //   WHATSAPP_AGENT_TOKEN — segredo compartilhado com smart-billing-agent/.env
 //   RESEND_API_KEY, EMAIL_FROM, PUBLIC_APP_URL — apenas para
-//     send_email_reminder (mesmos secrets já usados por send-receipt-email;
-//     se ausentes, a ação responde "email_not_configured" sem derrubar o
-//     worker nem as demais ações desta function).
+//     send_daily_email_reminder (mesmos secrets já usados por
+//     send-receipt-email; se ausentes, a ação responde
+//     "email_not_configured" sem derrubar o worker nem as demais ações
+//     desta function).
 //
 // Variáveis automáticas de toda Edge Function:
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY
@@ -54,8 +63,6 @@ const FN_NAME = 'whatsapp-agent-api';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const AGENT_STATUSES = ['offline', 'starting', 'qr_required', 'authenticated', 'ready', 'disconnected', 'error'];
-const REMINDER_MESSAGE_TYPES = ['due_soon_reminder', 'overdue_reminder'];
-const REMINDER_KINDS = ['due_soon_3', 'due_soon_1', 'due_today', 'overdue'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const CORS_HEADERS: Record<string, string> = {
@@ -131,17 +138,23 @@ function escapeHtml(str: string): string {
   }[c] as string));
 }
 
-const REMINDER_KIND_LABEL: Record<string, (dueDateBR: string) => string> = {
-  due_soon_3: (dueDateBR) => `Sua cobrança vence em 3 dias, no dia ${dueDateBR}.`,
-  due_soon_1: (dueDateBR) => `Sua cobrança vence amanhã (${dueDateBR}).`,
-  due_today: () => 'Sua cobrança vence hoje.',
-  overdue: (dueDateBR) => `Sua cobrança venceu em ${dueDateBR} e ainda não identificamos o pagamento.`,
+// kind = granularidade de "quão urgente" é uma cobrança em relação a hoje.
+// Usado tanto para ordenar as cobranças dentro do resumo (mais urgente
+// primeiro) quanto para rotular cada linha (WhatsApp e e-mail).
+const KIND_PRIORITY: Record<string, number> = { overdue: 0, due_today: 1, due_soon_1: 2, due_soon_3: 3 };
+const REMINDER_KIND_SHORT_LABEL: Record<string, string> = {
+  overdue: 'vencida',
+  due_today: 'vence hoje',
+  due_soon_1: 'vence amanhã',
+  due_soon_3: 'vence em 3 dias',
 };
 
-// Mapeia o "kind" (granularidade usada pelo worker) para o enum
-// whatsapp_message_type já existente no banco.
-function messageTypeForKind(kind: string): string {
-  return kind === 'overdue' ? 'overdue_reminder' : 'due_soon_reminder';
+function kindForDiff(diff: number): string | null {
+  if (diff < 0) return 'overdue';
+  if (diff === 0) return 'due_today';
+  if (diff === 1) return 'due_soon_1';
+  if (diff === 3) return 'due_soon_3';
+  return null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -328,103 +341,106 @@ Deno.serve(async (req: Request) => {
         const { data: company } = await adminClient.from('companies').select('name').eq('id', companyId).maybeSingle();
         const companyName = company?.name || 'Smart Billing';
 
-        const candidates: unknown[] = [];
+        // Agrupa por client_id: NO MÁXIMO 1 candidato por cliente, mesmo que
+        // ele tenha várias cobranças elegíveis hoje — é isso que garante,
+        // já na origem dos dados, que o worker nunca vai montar mais de uma
+        // mensagem automática por cliente por dia.
+        type ClientInfo = { id: string; name?: string; whatsapp?: string; email?: string };
+        type ChargeItem = { id: string; charge_number: string; description: string; amount: number; due_date: string; public_token: string; kind: string; label: string };
+        const byClient = new Map<string, { client: ClientInfo; charges: ChargeItem[] }>();
+
         for (const charge of charges || []) {
-          const client = charge.client as { id?: string; name?: string; whatsapp?: string; email?: string } | null;
-          if (!client?.whatsapp) continue; // sem WhatsApp cadastrado: nada a enviar
+          const client = charge.client as ClientInfo | null;
+          if (!client?.id || !client.whatsapp) continue; // sem WhatsApp cadastrado: nada a enviar
 
           const diff = daysBetween(today, charge.due_date as string);
-          let kind: string | null = null;
-          if (diff === 3 && settings.remind_3_days_before) kind = 'due_soon_3';
-          else if (diff === 1 && settings.remind_1_day_before) kind = 'due_soon_1';
-          else if (diff === 0 && settings.remind_on_due_date) kind = 'due_today';
-          else if (diff < 0 && settings.remind_when_overdue) kind = 'overdue';
+          const kind = kindForDiff(diff);
           if (!kind) continue;
+          if (kind === 'due_soon_3' && !settings.remind_3_days_before) continue;
+          if (kind === 'due_soon_1' && !settings.remind_1_day_before) continue;
+          if (kind === 'due_today' && !settings.remind_on_due_date) continue;
+          if (kind === 'overdue' && !settings.remind_when_overdue) continue;
 
-          const emailEnabled = Boolean(settings.email_reminders_enabled) && EMAIL_RE.test(client.email || '');
-
-          candidates.push({
+          if (!byClient.has(client.id)) byClient.set(client.id, { client, charges: [] });
+          byClient.get(client.id)!.charges.push({
+            id: charge.id as string,
+            charge_number: charge.charge_number as string,
+            description: charge.description as string,
+            amount: Number(charge.amount),
+            due_date: charge.due_date as string,
+            public_token: charge.public_token as string,
             kind,
-            message_type: messageTypeForKind(kind),
-            charge: {
-              id: charge.id,
-              charge_number: charge.charge_number,
-              description: charge.description,
-              amount: charge.amount,
-              due_date: charge.due_date,
-              public_token: charge.public_token,
-            },
+            label: REMINDER_KIND_SHORT_LABEL[kind],
+          });
+        }
+
+        const candidates: unknown[] = [];
+        for (const { client, charges: clientCharges } of byClient.values()) {
+          clientCharges.sort((a, b) => {
+            const rank = KIND_PRIORITY[a.kind] - KIND_PRIORITY[b.kind];
+            return rank !== 0 ? rank : a.due_date.localeCompare(b.due_date);
+          });
+          const emailEnabled = Boolean(settings.email_reminders_enabled) && EMAIL_RE.test(client.email || '');
+          candidates.push({
             client: { id: client.id, name: client.name, has_email: emailEnabled },
             company_name: companyName,
-            whatsapp_idempotency_key: `reminder:${charge.id}:${kind}`,
-            email_idempotency_key: emailEnabled ? `email-reminder:${charge.id}:${kind}` : null,
+            charges: clientCharges,
           });
         }
 
         return jsonResponse({ success: true, today, candidates });
       }
 
-      case 'enqueue_reminder': {
-        const chargeId = body?.charge_id;
-        const messageType = body?.message_type as string;
+      case 'enqueue_daily_reminder': {
+        const clientId = body?.client_id;
+        const chargeIds = body?.charge_ids;
         const message = body?.message;
-        const idempotencyKey = body?.idempotency_key;
-        if (!isValidUuid(chargeId)) return jsonResponse({ success: false, message: 'charge_id inválido.' }, 400);
-        if (!REMINDER_MESSAGE_TYPES.includes(messageType)) return jsonResponse({ success: false, message: 'message_type inválido.' }, 400);
+        if (!isValidUuid(clientId)) return jsonResponse({ success: false, message: 'client_id inválido.' }, 400);
+        if (!Array.isArray(chargeIds) || chargeIds.length === 0 || !chargeIds.every(isValidUuid)) {
+          return jsonResponse({ success: false, message: 'charge_ids inválido.' }, 400);
+        }
         if (typeof message !== 'string' || !message.trim()) return jsonResponse({ success: false, message: 'message inválida.' }, 400);
-        if (typeof idempotencyKey !== 'string' || !idempotencyKey.trim()) return jsonResponse({ success: false, message: 'idempotency_key inválida.' }, 400);
 
-        const { data, error } = await adminClient.rpc('enqueue_whatsapp_message_system', {
+        // A idempotency_key é SEMPRE calculada aqui, no servidor, a partir de
+        // company_id + client_id + dia local (America/Sao_Paulo) — nunca
+        // aceita do worker. É essa chave, com a constraint UNIQUE de
+        // whatsapp_outbox.idempotency_key, que garante no banco (não só em
+        // memória) no máximo 1 lembrete automático por cliente por dia,
+        // mesmo com ciclos concorrentes ou repetidos.
+        const idempotencyKey = `daily-reminder:${companyId}:${clientId}:${todayInAppTimezone()}`;
+
+        const { data, error } = await adminClient.rpc('enqueue_daily_reminder_system', {
           p_company_id: companyId,
-          p_charge_id: chargeId,
-          p_message_type: messageType,
+          p_client_id: clientId,
+          p_charge_ids: chargeIds,
           p_message: message,
           p_idempotency_key: idempotencyKey,
         });
         if (error) throw error;
-        logEvent({ action, company_id: companyId, charge_id: chargeId, message_type: messageType });
+        logEvent({ action, company_id: companyId, client_id: clientId, charges: chargeIds.length });
         return jsonResponse({ success: true, job: data });
       }
 
-      case 'send_email_reminder': {
-        const chargeId = body?.charge_id;
-        const kind = body?.kind as string;
-        const idempotencyKey = body?.idempotency_key;
-        if (!isValidUuid(chargeId)) return jsonResponse({ success: false, message: 'charge_id inválido.' }, 400);
-        if (!REMINDER_KINDS.includes(kind)) return jsonResponse({ success: false, message: 'kind inválido.' }, 400);
-        if (typeof idempotencyKey !== 'string' || !idempotencyKey.trim()) return jsonResponse({ success: false, message: 'idempotency_key inválida.' }, 400);
-
-        const { data: charge, error: chargeErr } = await adminClient
-          .from('charges')
-          .select('id, charge_number, description, amount, due_date, public_token, status, client:clients(name, email)')
-          .eq('id', chargeId).eq('company_id', companyId).maybeSingle();
-        if (chargeErr) throw chargeErr;
-        if (!charge) return jsonResponse({ success: false, message: 'Cobrança não encontrada.' }, 404);
-
-        // Confirma de novo, agora, que a cobrança ainda está pendente — fecha
-        // a mesma janela de corrida do lado do WhatsApp (cliente pode ter
-        // pago entre o worker listar candidatos e chegar aqui).
-        if (charge.status !== 'pending') {
-          await adminClient.from('notification_logs').insert({
-            company_id: companyId,
-            charge_id: chargeId,
-            channel: 'email',
-            recipient: null,
-            status: 'skipped',
-            error_message: `Cobrança não está mais pendente (status atual: ${charge.status}).`,
-            idempotency_key: idempotencyKey,
-          }).select().maybeSingle();
-          return jsonResponse({ success: true, skipped: 'not_pending' });
+      case 'send_daily_email_reminder': {
+        const clientId = body?.client_id;
+        const chargeIds = body?.charge_ids;
+        if (!isValidUuid(clientId)) return jsonResponse({ success: false, message: 'client_id inválido.' }, 400);
+        if (!Array.isArray(chargeIds) || chargeIds.length === 0 || !chargeIds.every(isValidUuid)) {
+          return jsonResponse({ success: false, message: 'charge_ids inválido.' }, 400);
         }
 
-        const client = charge.client as { name?: string; email?: string } | null;
-        const recipientEmail = client?.email;
+        // Mesma lógica de chave: sempre calculada aqui, nunca aceita do worker.
+        const idempotencyKey = `email-daily-reminder:${companyId}:${clientId}:${todayInAppTimezone()}`;
 
-        if (!EMAIL_RE.test(recipientEmail || '')) {
-          // Sem e-mail válido: registra e segue em frente — nunca derruba o worker.
+        const { data: client, error: clientErr } = await adminClient
+          .from('clients').select('name, email').eq('id', clientId).eq('company_id', companyId).maybeSingle();
+        if (clientErr) throw clientErr;
+        if (!client) return jsonResponse({ success: false, message: 'Cliente não encontrado.' }, 404);
+
+        if (!EMAIL_RE.test(client.email || '')) {
           await adminClient.from('notification_logs').insert({
             company_id: companyId,
-            charge_id: chargeId,
+            charge_id: null,
             channel: 'email',
             recipient: null,
             status: 'skipped',
@@ -434,6 +450,32 @@ Deno.serve(async (req: Request) => {
           return jsonResponse({ success: true, skipped: 'no_email' });
         }
 
+        // Confirma de novo, agora, que TODAS as cobranças do resumo ainda
+        // pertencem a este cliente/empresa e continuam pendentes — nunca
+        // envia um resumo desatualizado (cliente pode ter pago uma delas
+        // entre o worker listar candidatos e chegar aqui).
+        const { data: charges, error: chargesErr } = await adminClient
+          .from('charges')
+          .select('id, charge_number, description, amount, due_date, public_token, status')
+          .in('id', chargeIds)
+          .eq('company_id', companyId)
+          .eq('client_id', clientId);
+        if (chargesErr) throw chargesErr;
+
+        const pendingCharges = (charges || []).filter((c) => c.status === 'pending');
+        if (pendingCharges.length === 0 || pendingCharges.length !== chargeIds.length) {
+          await adminClient.from('notification_logs').insert({
+            company_id: companyId,
+            charge_id: pendingCharges[0]?.id ?? null,
+            channel: 'email',
+            recipient: client.email,
+            status: 'skipped',
+            error_message: 'Uma ou mais cobranças do resumo não estão mais pendentes.',
+            idempotency_key: idempotencyKey,
+          }).select().maybeSingle();
+          return jsonResponse({ success: true, skipped: 'not_pending' });
+        }
+
         // Reivindica o envio de forma atômica: se idempotency_key já existir,
         // o upsert com ignoreDuplicates não retorna linha — sinal de que já
         // foi processado (ou está sendo processado agora) e não deve repetir.
@@ -441,9 +483,9 @@ Deno.serve(async (req: Request) => {
           .from('notification_logs')
           .upsert({
             company_id: companyId,
-            charge_id: chargeId,
+            charge_id: pendingCharges[0].id,
             channel: 'email',
-            recipient: recipientEmail,
+            recipient: client.email,
             status: 'pending',
             idempotency_key: idempotencyKey,
           }, { onConflict: 'idempotency_key', ignoreDuplicates: true })
@@ -463,36 +505,57 @@ Deno.serve(async (req: Request) => {
             status: 'failed',
             error_message: 'Serviço de e-mail não configurado (RESEND_API_KEY/EMAIL_FROM/PUBLIC_APP_URL).',
           }).eq('id', claimed.id);
-          logEvent({ action, company_id: companyId, charge_id: chargeId, error: 'email_not_configured' });
+          logEvent({ action, company_id: companyId, client_id: clientId, error: 'email_not_configured' });
           return jsonResponse({ success: true, skipped: 'email_not_configured' });
         }
 
         const { data: company } = await adminClient.from('companies').select('name').eq('id', companyId).maybeSingle();
         const companyName = company?.name || 'Smart Billing';
-        const clientName = client?.name || 'Cliente';
-        const dueDateBR = formatDateBR(charge.due_date as string);
-        const label = (REMINDER_KIND_LABEL[kind] || REMINDER_KIND_LABEL.due_today)(dueDateBR);
-        const publicLink = `${PUBLIC_APP_URL}/cobranca-publica.html?token=${charge.public_token}`;
-        const subject = kind === 'overdue'
-          ? `Cobrança em atraso — ${companyName}`
-          : `Lembrete de cobrança — vencimento ${dueDateBR}`;
+        const clientName = client.name || 'Cliente';
+        const today = todayInAppTimezone();
+
+        const sortedCharges = [...pendingCharges].sort((a, b) => {
+          const diffA = daysBetween(today, a.due_date as string);
+          const diffB = daysBetween(today, b.due_date as string);
+          return diffA - diffB;
+        });
+
+        const rowsHtml = sortedCharges.map((c) => {
+          const diff = daysBetween(today, c.due_date as string);
+          const kind = kindForDiff(diff) || 'due_soon_3';
+          const label = REMINDER_KIND_SHORT_LABEL[kind] || '';
+          const link = `${PUBLIC_APP_URL}/cobranca-publica.html?token=${c.public_token}`;
+          return `<tr>
+            <td style="padding:6px 8px 6px 0;color:#666;">${escapeHtml(c.charge_number as string || '—')}</td>
+            <td style="padding:6px 8px;">${escapeHtml(c.description as string || '')}</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:bold;white-space:nowrap;">${formatCurrencyBRL(Number(c.amount))}</td>
+            <td style="padding:6px 8px;text-align:right;white-space:nowrap;">${escapeHtml(label)}</td>
+            <td style="padding:6px 0 6px 8px;text-align:right;"><a href="${link}">Pagar</a></td>
+          </tr>`;
+        }).join('');
+
+        const subject = pendingCharges.length > 1
+          ? `Você tem ${pendingCharges.length} cobranças pendentes — ${companyName}`
+          : `Lembrete de cobrança — ${companyName}`;
 
         const html = `
-          <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#1a1a1a;">
+          <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a;">
             <h2 style="margin-bottom:4px;">${escapeHtml(companyName)}</h2>
             <p style="color:#555;margin-top:0;">Lembrete de cobrança</p>
             <p>Olá ${escapeHtml(clientName)},</p>
-            <p>${escapeHtml(label)}</p>
+            <p>Você possui ${pendingCharges.length} cobrança${pendingCharges.length > 1 ? 's' : ''} pendente${pendingCharges.length > 1 ? 's' : ''}:</p>
             <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-              <tr><td style="padding:6px 0;color:#666;">Cobrança</td><td style="padding:6px 0;text-align:right;">${escapeHtml(charge.charge_number as string || '—')}</td></tr>
-              <tr><td style="padding:6px 0;color:#666;">Descrição</td><td style="padding:6px 0;text-align:right;">${escapeHtml(charge.description as string || '')}</td></tr>
-              <tr><td style="padding:6px 0;color:#666;">Valor</td><td style="padding:6px 0;text-align:right;font-weight:bold;">${formatCurrencyBRL(Number(charge.amount))}</td></tr>
-              <tr><td style="padding:6px 0;color:#666;">Vencimento</td><td style="padding:6px 0;text-align:right;">${dueDateBR}</td></tr>
+              <thead>
+                <tr style="text-align:left;color:#999;font-size:11px;text-transform:uppercase;">
+                  <th style="padding:0 8px 6px 0;">Cobrança</th>
+                  <th style="padding:0 8px 6px;">Descrição</th>
+                  <th style="padding:0 8px 6px;text-align:right;">Valor</th>
+                  <th style="padding:0 8px 6px;text-align:right;">Situação</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml}</tbody>
             </table>
-            <div style="text-align:center;margin:24px 0;">
-              <a href="${publicLink}" style="background:#1a56db;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;">Visualizar e pagar</a>
-            </div>
-            <p style="font-size:12px;color:#888;">Ou copie e cole este link no navegador:<br /><a href="${publicLink}">${publicLink}</a></p>
             <hr style="border:none;border-top:1px solid #eee;margin:24px 0;" />
             <p style="font-size:11px;color:#999;text-align:center;">Mensagem automática enviada pelo Smart Billing.</p>
           </div>
@@ -504,7 +567,7 @@ Deno.serve(async (req: Request) => {
           const res = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ from: EMAIL_FROM, to: [recipientEmail], subject, html }),
+            body: JSON.stringify({ from: EMAIL_FROM, to: [client.email], subject, html }),
           });
           if (!res.ok) {
             sendStatus = 'failed';
@@ -519,11 +582,11 @@ Deno.serve(async (req: Request) => {
 
         await adminClient.from('notification_logs').update({
           status: sendStatus,
-          message: sendStatus === 'sent' ? `Lembrete (${kind}) da cobrança ${charge.charge_number} enviado por e-mail` : null,
+          message: sendStatus === 'sent' ? `Resumo diário (${pendingCharges.length} cobrança(s)) enviado por e-mail` : null,
           error_message: errorMessage,
         }).eq('id', claimed.id);
 
-        logEvent({ action, company_id: companyId, charge_id: chargeId, kind, status: sendStatus });
+        logEvent({ action, company_id: companyId, client_id: clientId, charges: pendingCharges.length, status: sendStatus });
         return jsonResponse({ success: sendStatus === 'sent', status: sendStatus, message: errorMessage || undefined });
       }
 

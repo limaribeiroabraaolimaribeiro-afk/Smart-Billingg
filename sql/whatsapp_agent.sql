@@ -41,7 +41,7 @@ exception when duplicate_object then null; end $$;
 
 do $$ begin
   create type public.whatsapp_message_type as enum (
-    'charge', 'overdue_reminder', 'due_soon_reminder', 'receipt', 'test', 'custom'
+    'charge', 'overdue_reminder', 'due_soon_reminder', 'receipt', 'test', 'custom', 'daily_reminder'
   );
 exception when duplicate_object then null; end $$;
 
@@ -77,6 +77,7 @@ create table if not exists public.whatsapp_outbox (
   id                  uuid primary key default gen_random_uuid(),
   company_id          uuid not null references public.companies (id) on delete cascade,
   charge_id           uuid references public.charges (id) on delete set null,
+  charge_ids          uuid[],
   receipt_id          uuid references public.receipts (id) on delete set null,
   client_id           uuid references public.clients (id) on delete set null,
   recipient           text not null,
@@ -96,7 +97,8 @@ create table if not exists public.whatsapp_outbox (
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now()
 );
-comment on table public.whatsapp_outbox is 'Fila de mensagens de WhatsApp a enviar pelo agente local. Preenchida via enqueue_whatsapp_message(), processada via claim_whatsapp_jobs().';
+comment on table public.whatsapp_outbox is 'Fila de mensagens de WhatsApp a enviar pelo agente local. Preenchida via enqueue_whatsapp_message()/enqueue_daily_reminder_system(), processada via claim_whatsapp_jobs().';
+comment on column public.whatsapp_outbox.charge_ids is 'Todas as cobranças incluídas num resumo diário (message_type = daily_reminder). charge_id (singular) continua preenchido com a cobrança mais urgente do resumo, só para compatibilidade com o histórico "por cobrança" do painel.';
 
 -- ---------------------------------------------------------------------------
 -- whatsapp_settings: preferências de envio automático por empresa.
@@ -130,6 +132,7 @@ create index if not exists idx_whatsapp_outbox_charge           on public.whatsa
 create index if not exists idx_whatsapp_outbox_receipt          on public.whatsapp_outbox (receipt_id);
 -- Acelera a busca atômica em claim_whatsapp_jobs (status pending + scheduled_at).
 create index if not exists idx_whatsapp_outbox_claim            on public.whatsapp_outbox (company_id, status, scheduled_at) where status = 'pending';
+create index if not exists idx_whatsapp_outbox_charge_ids       on public.whatsapp_outbox using gin (charge_ids);
 
 
 -- ============================================================================
@@ -156,12 +159,15 @@ create trigger trg_whatsapp_settings_updated_at before update on public.whatsapp
 -- mensagem seja entregue a apenas uma execução. Restrita à service_role: só
 -- a Edge Function whatsapp-agent-api (nunca o navegador) pode chamá-la.
 --
--- Antes de reivindicar, faz duas higienizações (necessárias para o worker
--- de cobrança automática — ver sql/vps_worker_automation.sql para o
--- histórico/justificativa completa):
+-- Antes de reivindicar, faz três higienizações (necessárias para o worker
+-- de cobrança automática — ver sql/vps_worker_automation.sql e
+-- sql/fix_daily_reminder_dedup.sql para o histórico/justificativa completa):
 --   (a) cancela mensagens "pending" de tipo charge/due_soon_reminder/
 --       overdue_reminder cuja cobrança não está mais pendente (paga/
 --       cancelada) ou foi excluída (charge_id NULL);
+--   (a2) mesma lógica para resumos diários consolidados (message_type =
+--       daily_reminder): cancela o resumo INTEIRO se qualquer cobrança do
+--       array charge_ids não estiver mais pendente;
 --   (b) marca como "failed" mensagens travadas em "processing" há mais de
 --       5 minutos (worker encerrado/travado no meio do envio) — nunca
 --       volta sozinha para "pending", para não arriscar duplicar uma
@@ -184,6 +190,22 @@ begin
     and not exists (
       select 1 from public.charges c
       where c.id = o.charge_id and c.status = 'pending'
+    );
+
+  update public.whatsapp_outbox o
+  set status = 'cancelled',
+      error_message = 'Uma ou mais cobranças do resumo diário não estão mais pendentes no momento do envio — mensagem cancelada automaticamente.',
+      updated_at = now()
+  where o.company_id = p_company_id
+    and o.status = 'pending'
+    and o.message_type = 'daily_reminder'
+    and (
+      o.charge_ids is null
+      or array_length(o.charge_ids, 1) is null
+      or exists (
+        select 1 from unnest(o.charge_ids) as cid
+        where not exists (select 1 from public.charges c where c.id = cid and c.status = 'pending')
+      )
     );
 
   update public.whatsapp_outbox o
