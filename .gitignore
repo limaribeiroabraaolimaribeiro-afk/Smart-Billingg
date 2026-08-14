@@ -16,6 +16,10 @@ smart-billing-agent/*.log
 node_modules/
 smart-billing-agent/node_modules/
 
+# Cache local do Supabase CLI (não deve ir para o Git — inclui project_ref
+# do projeto vinculado localmente, que pode variar por máquina/desenvolvedor)
+supabase/.temp/
+
 # Sistema / editor
 .DS_Store
 Thumbs.db

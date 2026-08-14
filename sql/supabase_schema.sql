@@ -442,6 +442,9 @@ create trigger on_auth_user_created
 -- conjunto restrito de colunas. Nenhum dado sensível da empresa (documento,
 -- endereço, etc.) é exposto. Não existe policy pública direta sobre as
 -- tabelas charges/receipts — todo acesso público passa por aqui.
+-- get_public_receipt_by_token NÃO retorna provider_transaction_id (código da
+-- transação do gateway): esse campo continua existindo em payments para uso
+-- interno do painel autenticado, mas nunca é exposto ao anônimo.
 -- ============================================================================
 create or replace function public.get_public_charge_by_token(p_token uuid)
 returns table (
@@ -497,8 +500,7 @@ returns table (
   payment_method    public.payment_method_type,
   installments      integer,
   gross_amount      numeric,
-  paid_at           timestamptz,
-  provider_transaction_id text
+  paid_at           timestamptz
 )
 language sql
 stable
@@ -516,8 +518,7 @@ as $$
     p.payment_method,
     p.installments,
     p.gross_amount,
-    p.paid_at,
-    p.provider_transaction_id
+    p.paid_at
   from public.receipts r
   join public.charges c on c.id = r.charge_id
   join public.payments p on p.id = r.payment_id
