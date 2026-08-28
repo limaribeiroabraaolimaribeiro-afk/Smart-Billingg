@@ -13,6 +13,7 @@
 const config = require('./config');
 const logger = require('./logger');
 const billing = require('./billing');
+const subscriptions = require('./subscriptions');
 
 let timer = null;
 let running = false;
@@ -27,6 +28,14 @@ async function tick() {
   try {
     const summary = await billing.runCycle();
     logger.info(`[SCHEDULER] ciclo finalizado — clientes=${summary.clientsAnalyzed} cobrancas=${summary.chargesAnalyzed} whatsapp=${summary.whatsappEnqueued} email=${summary.emailSent} erros=${summary.errors}`);
+
+    // Renovação mensal de assinaturas — mesmo ciclo, mas isolada em try/catch
+    // própria: uma falha aqui nunca deve impedir os lembretes acima (nem
+    // vice-versa, já que já rodou antes desta linha).
+    const renewalSummary = await subscriptions.runRenewalCycle();
+    if (renewalSummary.subscriptionsAnalyzed > 0) {
+      logger.info(`[SCHEDULER] renovacoes — analisadas=${renewalSummary.subscriptionsAnalyzed} renovadas=${renewalSummary.renewed} erros=${renewalSummary.errors}`);
+    }
   } catch (err) {
     // Segurança extra: mesmo que billing.runCycle() já trate seus próprios
     // erros internamente, nunca deixa uma exceção aqui derrubar o processo.

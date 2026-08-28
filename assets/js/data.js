@@ -234,6 +234,20 @@ const DB = (() => {
     let state = load();
     function persist() { save(state); }
 
+    // Snapshots salvos antes deste recurso existir não têm essas listas —
+    // inicializa com os 3 planos padrão na primeira vez que o demo roda
+    // depois da atualização, sem apagar nada do que já existia.
+    if (!Array.isArray(state.planos)) {
+      state.planos = [
+        { id: 'plano_mensal', nome: 'Mensal', descricaoCurta: 'Flexível', valor: 190, valorReferencia: null, descontoPercent: 0, duracaoMeses: 1, tipoCobranca: 'recurring_monthly', badge: '', destaque: false, formaPagamento: 'ambos', parcelas: 12, ativo: true, ordem: 1, criadoEm: daysFromToday(-60) },
+        { id: 'plano_anual', nome: 'Anual', descricaoCurta: '', valor: 1938, valorReferencia: 2280, descontoPercent: 15, duracaoMeses: 12, tipoCobranca: 'one_time', badge: 'MAIS ESCOLHIDO', destaque: true, formaPagamento: 'ambos', parcelas: 12, ativo: true, ordem: 2, criadoEm: daysFromToday(-60) },
+        { id: 'plano_2anos', nome: '2 anos', descricaoCurta: '', valor: 3648, valorReferencia: 4560, descontoPercent: 20, duracaoMeses: 24, tipoCobranca: 'one_time', badge: 'MELHOR ECONOMIA', destaque: false, formaPagamento: 'ambos', parcelas: 12, ativo: true, ordem: 3, criadoEm: daysFromToday(-60) },
+      ];
+      persist();
+    }
+    if (!Array.isArray(state.ofertas)) { state.ofertas = []; persist(); }
+    if (!Array.isArray(state.assinaturas)) { state.assinaturas = []; persist(); }
+
     function withComputedStatus(c) {
       return { ...c, status: computeEffectiveStatus(c.status, c.vencimento) };
     }
@@ -518,7 +532,169 @@ const DB = (() => {
       },
     };
 
-    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa, whatsapp };
+    // ---------------- planos, ofertas e assinaturas ----------------
+    function planoAtivosCount(planoId) {
+      return state.assinaturas.filter((a) => a.planoId === planoId && a.status === 'active').length;
+    }
+
+    const planos = {
+      list() {
+        return delay(() => [...state.planos].sort((a, b) => a.ordem - b.ordem).map((p) => ({ ...p })));
+      },
+      listWithStats() {
+        return delay(() => [...state.planos].sort((a, b) => a.ordem - b.ordem).map((p) => ({ ...p, clientesAtivos: planoAtivosCount(p.id) })));
+      },
+      get(id) {
+        return delay(() => {
+          const p = state.planos.find((x) => x.id === id);
+          return p ? { ...p } : null;
+        });
+      },
+      create(payload) {
+        return delay(() => {
+          const novo = { id: uid('plano'), ativo: true, ordem: state.planos.length + 1, criadoEm: new Date().toISOString(), ...payload };
+          state.planos.push(novo);
+          persist();
+          return { ...novo };
+        });
+      },
+      update(id, payload) {
+        return delay(() => {
+          const idx = state.planos.findIndex((p) => p.id === id);
+          if (idx === -1) throw new Error('Plano não encontrado');
+          state.planos[idx] = { ...state.planos[idx], ...payload };
+          persist();
+          return { ...state.planos[idx] };
+        });
+      },
+      duplicate(id) {
+        return delay(() => {
+          const original = state.planos.find((p) => p.id === id);
+          if (!original) throw new Error('Plano não encontrado');
+          const copia = { ...original, id: uid('plano'), nome: `${original.nome} (cópia)`, ativo: false, ordem: state.planos.length + 1, criadoEm: new Date().toISOString() };
+          state.planos.push(copia);
+          persist();
+          return { ...copia };
+        });
+      },
+      remove(id) {
+        return delay(() => {
+          if (planoAtivosCount(id) > 0) {
+            return { success: false, message: 'Este plano tem assinaturas ativas e não pode ser excluído. Desative-o em vez de excluir.' };
+          }
+          state.planos = state.planos.filter((p) => p.id !== id);
+          persist();
+          return { success: true };
+        });
+      },
+    };
+
+    const ofertas = {
+      create({ clienteId, planIds, titulo, mensagem, expiraEmDias = 7 }) {
+        return delay(() => {
+          const cliente = state.clientes.find((c) => c.id === clienteId);
+          if (!cliente) throw new Error('Cliente não encontrado');
+          const expira = new Date();
+          expira.setDate(expira.getDate() + Math.max(1, expiraEmDias || 7));
+          const nova = {
+            id: uid('oferta'), clienteId, planIds, titulo: titulo || null, mensagem: mensagem || null,
+            publicToken: uid('tok'), status: 'active', expiraEm: expira.toISOString(),
+            planoSelecionadoId: null, cobrancaId: null, selecionadoEm: null, criadoEm: new Date().toISOString(),
+          };
+          state.ofertas.push(nova);
+          persist();
+          return { ...nova };
+        });
+      },
+      getByPublicToken(token) {
+        return delay(() => {
+          const o = state.ofertas.find((x) => x.publicToken === token);
+          if (!o) return null;
+          const cliente = state.clientes.find((c) => c.id === o.clienteId);
+          const empresa = state.empresa;
+          const isExpired = o.status === 'active' && new Date(o.expiraEm) < new Date();
+          const planoSel = o.planoSelecionadoId ? state.planos.find((p) => p.id === o.planoSelecionadoId) : null;
+          const cobranca = o.cobrancaId ? state.cobrancas.find((c) => c.id === o.cobrancaId) : null;
+          return {
+            id: o.id, titulo: o.titulo, mensagem: o.mensagem, status: o.status, isExpired,
+            expiraEm: o.expiraEm, clienteNome: cliente?.nome || 'Cliente', empresaNome: empresa?.nome || 'Smart Billing',
+            planoSelecionadoNome: planoSel?.nome || null,
+            cobrancaStatus: cobranca ? cobranca.status : null,
+            cobrancaPublicToken: cobranca ? cobranca.publicToken : null,
+            planos: state.planos.filter((p) => o.planIds.includes(p.id) && p.ativo).sort((a, b) => a.ordem - b.ordem),
+          };
+        });
+      },
+      // Em modo demo a "cobrança" é criada localmente (sem InfinitePay real) —
+      // suficiente para exercitar a navegação/UX da página pública offline.
+      selectPlan({ offerToken, planId }) {
+        return delay(() => {
+          const o = state.ofertas.find((x) => x.publicToken === offerToken);
+          if (!o) return { success: false, result: 'not_found' };
+          if (o.status === 'selected') return { success: true, result: 'already_selected', charge_public_token: state.cobrancas.find((c) => c.id === o.cobrancaId)?.publicToken };
+          if (new Date(o.expiraEm) < new Date()) return { success: false, result: 'expired' };
+          if (!o.planIds.includes(planId)) return { success: false, result: 'invalid_plan' };
+          const plano = state.planos.find((p) => p.id === planId && p.ativo);
+          if (!plano) return { success: false, result: 'invalid_plan' };
+
+          const novaCobranca = {
+            id: uid('cob'), clienteId: o.clienteId, descricao: `Plano ${plano.nome}`, valor: plano.valor,
+            vencimento: new Date().toISOString(), status: 'pendente', formaPagamento: plano.formaPagamento,
+            parcelas: plano.parcelas, publicToken: uid('tok'), checkoutUrl: null, criadoEm: new Date().toISOString(), pagoEm: null,
+            planoId: plano.id, ofertaId: o.id,
+          };
+          state.cobrancas.unshift(novaCobranca);
+
+          const novaAssinatura = {
+            id: uid('assin'), clienteId: o.clienteId, planoId: plano.id, cobrancaInicialId: novaCobranca.id,
+            status: 'pending', startsAt: null, endsAt: null, nextBillingAt: null, criadoEm: new Date().toISOString(),
+          };
+          state.assinaturas.push(novaAssinatura);
+
+          o.status = 'selected';
+          o.planoSelecionadoId = plano.id;
+          o.cobrancaId = novaCobranca.id;
+          o.selecionadoEm = new Date().toISOString();
+          persist();
+          return { success: true, result: 'created', charge_public_token: novaCobranca.publicToken };
+        });
+      },
+      listForClient(clienteId) {
+        return delay(() => state.ofertas.filter((o) => o.clienteId === clienteId).map((o) => ({ ...o })));
+      },
+    };
+
+    const assinaturas = {
+      getCurrentForClient(clienteId) {
+        return delay(() => {
+          const lista = state.assinaturas.filter((a) => a.clienteId === clienteId).sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm));
+          const atual = lista.find((a) => a.status === 'active' || a.status === 'pending' || a.status === 'overdue') || lista[0] || null;
+          if (!atual) return null;
+          const plano = state.planos.find((p) => p.id === atual.planoId);
+          return { ...atual, planoNome: plano?.nome || '', planoValor: plano?.valor || 0, planoTipo: plano?.tipoCobranca || '' };
+        });
+      },
+      listForClient(clienteId) {
+        return delay(() => state.assinaturas
+          .filter((a) => a.clienteId === clienteId)
+          .sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm))
+          .map((a) => {
+            const plano = state.planos.find((p) => p.id === a.planoId);
+            return { ...a, planoNome: plano?.nome || '' };
+          }));
+      },
+      cancel(id) {
+        return delay(() => {
+          const idx = state.assinaturas.findIndex((a) => a.id === id);
+          if (idx === -1) throw new Error('Assinatura não encontrada');
+          state.assinaturas[idx] = { ...state.assinaturas[idx], status: 'cancelled', cancelledAt: new Date().toISOString(), nextBillingAt: null };
+          persist();
+          return { ...state.assinaturas[idx] };
+        });
+      },
+    };
+
+    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa, whatsapp, planos, ofertas, assinaturas };
   }
 
   // ==========================================================================
@@ -1078,7 +1254,232 @@ const DB = (() => {
       },
     };
 
-    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa, whatsapp };
+    // ---------------- planos ----------------
+    function mapPlano(row) {
+      if (!row) return null;
+      return {
+        id: row.id,
+        nome: row.name,
+        descricao: row.description || '',
+        descricaoCurta: row.short_description || '',
+        valor: Number(row.amount),
+        valorReferencia: row.reference_amount != null ? Number(row.reference_amount) : null,
+        descontoPercent: Number(row.discount_percent || 0),
+        duracaoMeses: row.duration_months,
+        tipoCobranca: row.billing_type,
+        badge: row.badge || '',
+        destaque: !!row.featured,
+        formaPagamento: paymentMethodsToForma(row.payment_methods),
+        parcelas: row.max_installments,
+        ativo: !!row.active,
+        ordem: row.sort_order,
+        observacoes: row.notes || '',
+        criadoEm: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    }
+
+    const PLANO_SELECT = 'id, company_id, name, description, short_description, amount, reference_amount, discount_percent, duration_months, billing_type, badge, featured, payment_methods, max_installments, active, sort_order, notes, created_at, updated_at';
+
+    function planoToRow(payload) {
+      const row = {};
+      if (payload.nome !== undefined) row.name = payload.nome;
+      if (payload.descricao !== undefined) row.description = payload.descricao || null;
+      if (payload.descricaoCurta !== undefined) row.short_description = payload.descricaoCurta || null;
+      if (payload.valor !== undefined) row.amount = payload.valor;
+      if (payload.valorReferencia !== undefined) row.reference_amount = payload.valorReferencia || null;
+      if (payload.descontoPercent !== undefined) row.discount_percent = payload.descontoPercent || 0;
+      if (payload.duracaoMeses !== undefined) row.duration_months = payload.duracaoMeses;
+      if (payload.tipoCobranca !== undefined) row.billing_type = payload.tipoCobranca;
+      if (payload.badge !== undefined) row.badge = payload.badge || null;
+      if (payload.destaque !== undefined) row.featured = payload.destaque;
+      if (payload.formaPagamento !== undefined) row.payment_methods = formaToPaymentMethods(payload.formaPagamento);
+      if (payload.parcelas !== undefined) row.max_installments = payload.parcelas;
+      if (payload.ativo !== undefined) row.active = payload.ativo;
+      if (payload.ordem !== undefined) row.sort_order = payload.ordem;
+      if (payload.observacoes !== undefined) row.notes = payload.observacoes || null;
+      return row;
+    }
+
+    const planos = {
+      async list() {
+        const companyId = await getCompanyId();
+        const data = unwrap(await client.from('billing_plans').select(PLANO_SELECT).eq('company_id', companyId).order('sort_order'));
+        return data.map(mapPlano);
+      },
+      // Também traz o nº de assinaturas ativas de cada plano (para a
+      // listagem do painel: "12 clientes"). Uma query extra e pequena
+      // (agrupada em memória) é mais simples e segura que uma view nova.
+      async listWithStats() {
+        const companyId = await getCompanyId();
+        const [plansData, subsData] = await Promise.all([
+          client.from('billing_plans').select(PLANO_SELECT).eq('company_id', companyId).order('sort_order'),
+          client.from('client_subscriptions').select('plan_id').eq('company_id', companyId).eq('status', 'active'),
+        ]);
+        const plans = unwrap(plansData).map(mapPlano);
+        const subs = unwrap(subsData);
+        const counts = {};
+        subs.forEach((s) => { counts[s.plan_id] = (counts[s.plan_id] || 0) + 1; });
+        return plans.map((p) => ({ ...p, clientesAtivos: counts[p.id] || 0 }));
+      },
+      async get(id) {
+        const companyId = await getCompanyId();
+        const data = unwrap(await client.from('billing_plans').select(PLANO_SELECT).eq('company_id', companyId).eq('id', id).maybeSingle());
+        return mapPlano(data);
+      },
+      async create(payload) {
+        const companyId = await getCompanyId();
+        const row = { company_id: companyId, ...planoToRow(payload) };
+        const data = unwrap(await client.from('billing_plans').insert(row).select(PLANO_SELECT).single());
+        return mapPlano(data);
+      },
+      async update(id, payload) {
+        const companyId = await getCompanyId();
+        const row = planoToRow(payload);
+        const data = unwrap(await client.from('billing_plans').update(row).eq('company_id', companyId).eq('id', id).select(PLANO_SELECT).single());
+        return mapPlano(data);
+      },
+      async duplicate(id) {
+        const original = await planos.get(id);
+        if (!original) throw new Error('Plano não encontrado');
+        return planos.create({ ...original, nome: `${original.nome} (cópia)`, ativo: false });
+      },
+      async remove(id) {
+        const companyId = await getCompanyId();
+        const { error } = await client.from('billing_plans').delete().eq('company_id', companyId).eq('id', id);
+        if (error) {
+          // Violação de FK (on delete restrict) — plano em uso por alguma assinatura.
+          if (error.code === '23503') {
+            return { success: false, message: 'Este plano tem assinaturas associadas e não pode ser excluído. Desative-o em vez de excluir.' };
+          }
+          return { success: false, message: error.message || 'Não foi possível excluir o plano.' };
+        }
+        return { success: true };
+      },
+    };
+
+    // ---------------- ofertas de planos ----------------
+    function mapOfertaPublica(row) {
+      if (!row) return null;
+      return {
+        titulo: row.title,
+        mensagem: row.message,
+        status: row.status,
+        isExpired: row.is_expired,
+        expiraEm: row.expires_at,
+        clienteNome: row.client_name,
+        empresaNome: row.company_name,
+        planoSelecionadoNome: row.selected_plan_name,
+        cobrancaStatus: row.charge_status,
+        cobrancaPublicToken: row.charge_public_token,
+        planos: (row.plans || []).map((p) => ({
+          id: p.id, nome: p.name, descricao: p.description, descricaoCurta: p.short_description,
+          valor: Number(p.amount), valorReferencia: p.reference_amount != null ? Number(p.reference_amount) : null,
+          descontoPercent: Number(p.discount_percent || 0), duracaoMeses: p.duration_months, tipoCobranca: p.billing_type,
+          badge: p.badge || '', destaque: !!p.featured, formaPagamento: paymentMethodsToForma(p.payment_methods), parcelas: p.max_installments,
+        })),
+      };
+    }
+
+    const ofertas = {
+      async create({ clienteId, planIds, titulo, mensagem, expiraEmDias = 7 }) {
+        const companyId = await getCompanyId();
+        const data = unwrap(await client.rpc('create_plan_offer', {
+          p_company_id: companyId,
+          p_client_id: clienteId,
+          p_plan_ids: planIds,
+          p_title: titulo || null,
+          p_message: mensagem || null,
+          p_expires_in_days: expiraEmDias,
+        }));
+        const row = Array.isArray(data) ? data[0] : data;
+        return { id: row.id, publicToken: row.public_token, status: row.status, expiraEm: row.expires_at };
+      },
+      // Acesso público: usa a função SECURITY DEFINER (sem exigir sessão/RLS).
+      async getByPublicToken(token) {
+        const data = unwrap(await client.rpc('get_public_plan_offer_by_token', { p_token: token }));
+        const row = Array.isArray(data) ? data[0] : data;
+        if (!row) return null;
+        return mapOfertaPublica(row);
+      },
+      // Chama a Edge Function pública select-plan-offer — nunca envia
+      // preço/desconto/duração, só o token da oferta e o id do plano
+      // escolhido. Todo o resto é resolvido no banco (ver sql/billing_plans.sql).
+      async selectPlan({ offerToken, planId }) {
+        const { data, error } = await client.functions.invoke('select-plan-offer', {
+          body: { offer_token: offerToken, plan_id: planId },
+        });
+        if (error) {
+          let message = 'Não foi possível processar sua escolha. Tente novamente.';
+          try {
+            const body = await error.context?.json?.();
+            if (body?.message) message = body.message;
+          } catch (_) { /* mantém mensagem genérica */ }
+          return { success: false, message };
+        }
+        return data;
+      },
+      async listForClient(clienteId) {
+        const companyId = await getCompanyId();
+        const data = unwrap(await client.from('plan_offers').select('id, public_token, title, status, expires_at, selected_plan_id, charge_id, selected_at, created_at').eq('company_id', companyId).eq('client_id', clienteId).order('created_at', { ascending: false }));
+        return data.map((row) => ({
+          id: row.id, publicToken: row.public_token, titulo: row.title, status: row.status,
+          expiraEm: row.expires_at, planoSelecionadoId: row.selected_plan_id, cobrancaId: row.charge_id,
+          selecionadoEm: row.selected_at, criadoEm: row.created_at,
+        }));
+      },
+    };
+
+    // ---------------- assinaturas ----------------
+    function mapAssinatura(row) {
+      if (!row) return null;
+      return {
+        id: row.id,
+        clienteId: row.client_id,
+        planoId: row.plan_id,
+        planoNome: row.billing_plans?.name || '',
+        planoTipo: row.billing_plans?.billing_type || '',
+        planoValor: row.billing_plans ? Number(row.billing_plans.amount) : 0,
+        status: row.status,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
+        nextBillingAt: row.next_billing_at,
+        cancelledAt: row.cancelled_at,
+        criadoEm: row.created_at,
+      };
+    }
+
+    const ASSINATURA_SELECT = 'id, client_id, plan_id, status, starts_at, ends_at, next_billing_at, cancelled_at, created_at, billing_plans(name, billing_type, amount)';
+
+    const assinaturas = {
+      async getCurrentForClient(clienteId) {
+        const companyId = await getCompanyId();
+        const data = unwrap(await client.from('client_subscriptions').select(ASSINATURA_SELECT)
+          .eq('company_id', companyId).eq('client_id', clienteId)
+          .in('status', ['active', 'pending', 'overdue'])
+          .order('created_at', { ascending: false }).limit(1).maybeSingle());
+        if (data) return mapAssinatura(data);
+        // Sem assinatura em andamento: devolve a mais recente (cancelada/expirada), se houver.
+        const fallback = unwrap(await client.from('client_subscriptions').select(ASSINATURA_SELECT)
+          .eq('company_id', companyId).eq('client_id', clienteId)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle());
+        return mapAssinatura(fallback);
+      },
+      async listForClient(clienteId) {
+        const companyId = await getCompanyId();
+        const data = unwrap(await client.from('client_subscriptions').select(ASSINATURA_SELECT)
+          .eq('company_id', companyId).eq('client_id', clienteId)
+          .order('created_at', { ascending: false }));
+        return data.map(mapAssinatura);
+      },
+      async cancel(id) {
+        const data = unwrap(await client.rpc('cancel_client_subscription', { p_subscription_id: id }));
+        const row = Array.isArray(data) ? data[0] : data;
+        return mapAssinatura(row);
+      },
+    };
+
+    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa, whatsapp, planos, ofertas, assinaturas };
   }
 
   const backend = useDemo ? buildDemoBackend() : buildSupabaseBackend();

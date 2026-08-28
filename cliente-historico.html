@@ -29,6 +29,32 @@
 
     <div class="mini-stat-grid" id="mini-stats" style="display:none;"></div>
 
+    <div class="card" id="plano-card" style="margin-bottom:20px;">
+      <div class="card-header">
+        <div>
+          <div class="card-header__title">Plano atual</div>
+          <div class="card-header__subtitle">Assinatura e ofertas de planos deste cliente</div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-criar-oferta">
+          <span>+ Criar oferta de planos</span>
+        </button>
+      </div>
+      <div id="plano-region" class="card-pad">
+        <div class="skeleton skeleton-row"></div>
+      </div>
+    </div>
+
+    <div class="card" id="oferta-criacao-card" style="display:none;margin-bottom:20px;">
+      <div class="card-header">
+        <div>
+          <div class="card-header__title">Nova oferta de planos</div>
+          <div class="card-header__subtitle">Escolha os planos, defina a validade e gere o link para enviar ao cliente</div>
+        </div>
+        <button type="button" class="icon-btn" id="btn-fechar-oferta" aria-label="Fechar">✕</button>
+      </div>
+      <div class="card-pad" id="oferta-criacao-body"></div>
+    </div>
+
     <div class="card">
       <div class="card-header">
         <div>

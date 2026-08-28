@@ -63,4 +63,14 @@ module.exports = {
   sendDailyEmailReminder: ({ clientId, chargeIds }) => call('send_daily_email_reminder', {
     client_id: clientId, charge_ids: chargeIds,
   }),
+
+  // ---- Renovação mensal de assinaturas ----
+  // A InfinitePay não confirma cobrança recorrente automática nesta
+  // integração — o worker controla o ciclo mensal: lista o que venceu e
+  // pede para gerar a cobrança do próximo mês, uma assinatura por vez.
+  // create_subscription_renewal_charge é idempotente no banco por
+  // (subscription_id, renewal_period) — rodar o ciclo de novo (ou em
+  // paralelo) nunca duplica uma renovação.
+  listDueSubscriptionRenewals: (limit = 50) => call('list_due_subscription_renewals', { limit }),
+  createSubscriptionRenewalCharge: (subscriptionId) => call('create_subscription_renewal_charge', { subscription_id: subscriptionId }),
 };

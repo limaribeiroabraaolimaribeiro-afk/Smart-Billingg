@@ -44,6 +44,17 @@
 //        aqui, nunca aceita do chamador) e o mesmo modelo de composição de
 //        send-receipt-email (nunca aceita conteúdo do chamador — busca tudo
 //        do banco a partir de client_id/charge_ids).
+//   list_due_subscription_renewals { company_id, limit? }
+//     -> lista assinaturas mensais (billing_type=recurring_monthly) com
+//        next_billing_at vencido e sem cobrança ainda para o ciclo (ver
+//        sql/billing_plans.sql, seção 12).
+//   create_subscription_renewal_charge { company_id, subscription_id }
+//     -> cria a cobrança do próximo ciclo (idempotente por
+//        (subscription_id, renewal_period) — nunca duplica), gera o
+//        checkout InfinitePay (mesma lógica de create-infinitepay-checkout,
+//        via _shared/infinitepay.ts) e enfileira o aviso de WhatsApp na
+//        MESMA fila de sempre. Preço/duração SEMPRE vêm de billing_plans no
+//        banco — o worker só informa QUAL assinatura renovar.
 //
 // Secrets exigidos (supabase secrets set):
 //   WHATSAPP_AGENT_TOKEN — segredo compartilhado com smart-billing-agent/.env
@@ -58,6 +69,12 @@
 // ============================================================================
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import {
+  reaisToCents,
+  normalizePhoneBR,
+  isValidInfinitePayCheckoutUrl,
+  callCreateLink,
+} from '../_shared/infinitepay.ts';
 
 const FN_NAME = 'whatsapp-agent-api';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -168,6 +185,10 @@ Deno.serve(async (req: Request) => {
   const WHATSAPP_AGENT_TOKEN = Deno.env.get('WHATSAPP_AGENT_TOKEN') ?? '';
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
   const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  // Só usados por create_subscription_renewal_charge (gera o checkout da
+  // renovação) — mesmos secrets já usados por create-infinitepay-checkout.
+  const INFINITEPAY_HANDLE = (Deno.env.get('INFINITEPAY_HANDLE') ?? '').replace(/^\$/, '').trim();
+  const PUBLIC_APP_URL = (Deno.env.get('PUBLIC_APP_URL') ?? '').replace(/\/+$/, '');
 
   if (!WHATSAPP_AGENT_TOKEN) {
     logEvent({ error: 'missing_secret' });
@@ -588,6 +609,106 @@ Deno.serve(async (req: Request) => {
 
         logEvent({ action, company_id: companyId, client_id: clientId, charges: pendingCharges.length, status: sendStatus });
         return jsonResponse({ success: sendStatus === 'sent', status: sendStatus, message: errorMessage || undefined });
+      }
+
+      // ---- Ações de RENOVAÇÃO MENSAL de assinaturas (worker/VPS) ----
+      // A InfinitePay não confirma suporte a cobrança recorrente automática
+      // nesta integração — o Smart Billing controla a recorrência sozinho:
+      // o worker chama list_due_subscription_renewals a cada ciclo e, para
+      // cada linha, create_subscription_renewal_charge (idempotente por
+      // ciclo — ver sql/billing_plans.sql, seção 12).
+      case 'list_due_subscription_renewals': {
+        const limitRaw = Number(body?.limit ?? 50);
+        const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.trunc(limitRaw), 1), 100) : 50;
+        const { data, error } = await adminClient.rpc('list_due_subscription_renewals', {
+          p_company_id: companyId,
+          p_limit: limit,
+        });
+        if (error) throw error;
+        return jsonResponse({ success: true, renewals: data || [] });
+      }
+
+      case 'create_subscription_renewal_charge': {
+        const subscriptionId = body?.subscription_id;
+        if (!isValidUuid(subscriptionId)) return jsonResponse({ success: false, message: 'subscription_id inválido.' }, 400);
+
+        const { data: chargeData, error: chargeErr } = await adminClient.rpc('create_subscription_renewal_charge', {
+          p_subscription_id: subscriptionId,
+        });
+        if (chargeErr) throw chargeErr;
+        const charge = Array.isArray(chargeData) ? chargeData[0] : chargeData;
+        if (!charge?.id) {
+          return jsonResponse({ success: false, message: 'Não foi possível gerar a cobrança de renovação.' }, 500);
+        }
+
+        // Gera o checkout InfinitePay para a nova cobrança — mesma lógica
+        // (mesmo endpoint, mesma validação de host) de create-infinitepay-checkout.
+        let checkoutUrl: string | null = isValidInfinitePayCheckoutUrl(charge.checkout_url) ? charge.checkout_url : null;
+        if (!checkoutUrl && INFINITEPAY_HANDLE && PUBLIC_APP_URL) {
+          const { data: fullCharge } = await adminClient
+            .from('charges')
+            .select('id, client_id, charge_number, description, amount, public_token')
+            .eq('id', charge.id)
+            .maybeSingle();
+
+          if (fullCharge && Number(fullCharge.amount) > 0) {
+            let client: { name?: string; email?: string; whatsapp?: string } | null = null;
+            if (fullCharge.client_id) {
+              const { data: clientRow } = await adminClient.from('clients').select('name, email, whatsapp').eq('id', fullCharge.client_id).maybeSingle();
+              client = clientRow;
+            }
+            const customer: Record<string, string> = {};
+            if (client?.name) customer.name = client.name;
+            if (client?.email) customer.email = client.email;
+            const phone = normalizePhoneBR(client?.whatsapp);
+            if (phone) customer.phone_number = phone;
+
+            try {
+              const result = await callCreateLink({
+                handle: INFINITEPAY_HANDLE,
+                redirect_url: `${PUBLIC_APP_URL}/pagamento-confirmado.html?token=${fullCharge.public_token}`,
+                webhook_url: `${SUPABASE_URL}/functions/v1/infinitepay-webhook`,
+                order_nsu: fullCharge.charge_number,
+                ...(Object.keys(customer).length ? { customer } : {}),
+                items: [{ quantity: 1, price: reaisToCents(Number(fullCharge.amount)), description: fullCharge.description }],
+              });
+              if (result.ok && isValidInfinitePayCheckoutUrl(result.url)) {
+                checkoutUrl = result.url;
+                await adminClient.from('charges').update({ provider: 'infinitepay', provider_reference: fullCharge.charge_number, checkout_url: result.url }).eq('id', fullCharge.id);
+              }
+            } catch {
+              // Checkout falhou (rede/InfinitePay fora do ar): a cobrança já
+              // existe e pode ser regerada depois (painel ou próximo ciclo do
+              // worker) — não derruba a renovação nem duplica nada.
+              logEvent({ action, company_id: companyId, error: 'checkout_generation_failed', charge_id: charge.id });
+            }
+          }
+        }
+
+        // Aviso de WhatsApp da renovação — mesma fila de sempre, idempotente
+        // por cobrança (nunca duplica se o worker rodar de novo).
+        let whatsappEnqueued = false;
+        try {
+          const message = [
+            'Sua assinatura foi renovada automaticamente. 🔄',
+            '',
+            checkoutUrl ? 'Finalize o pagamento deste mês pelo link abaixo:' : 'Acesse o link abaixo para pagar:',
+            `${PUBLIC_APP_URL}/cobranca-publica.html?token=${charge.public_token || ''}`,
+          ].join('\n');
+          const { error: notifyErr } = await adminClient.rpc('enqueue_renewal_charge_notification_system', {
+            p_company_id: companyId,
+            p_charge_id: charge.id,
+            p_message: message,
+            p_idempotency_key: `renewal-notify:${charge.id}`,
+          });
+          whatsappEnqueued = !notifyErr;
+        } catch {
+          // Cliente sem WhatsApp cadastrado, ou cobrança não mais pendente
+          // entre a criação e aqui — não impede a renovação de existir.
+        }
+
+        logEvent({ action, company_id: companyId, subscription_id: subscriptionId, charge_id: charge.id, checkout: Boolean(checkoutUrl) });
+        return jsonResponse({ success: true, charge_id: charge.id, checkout_url: checkoutUrl, whatsapp_enqueued: whatsappEnqueued });
       }
 
       default:

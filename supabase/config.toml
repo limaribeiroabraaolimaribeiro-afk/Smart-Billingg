@@ -16,6 +16,12 @@ verify_jwt = false
 [functions.check-infinitepay-payment]
 verify_jwt = false
 
+# Página pública oferta.html (sem login) — a "autenticação" é o próprio
+# offer_token secreto e imprevisível, validado dentro da function via
+# select_plan_offer() (restrita a service_role no banco).
+[functions.select-plan-offer]
+verify_jwt = false
+
 [functions.send-receipt-email]
 verify_jwt = true
 

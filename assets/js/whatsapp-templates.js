@@ -93,5 +93,23 @@ const SB_WA = (() => {
     return 'due_soon_3';
   }
 
-  return { chargeMessage, receiptMessage, reminderMessage, reminderKindFor, publicChargeUrl, publicReceiptUrl };
+  function publicOfferUrl(publicToken) {
+    return `${SB_UI.appBaseUrl()}oferta.html?token=${publicToken}`;
+  }
+
+  function offerMessage(clienteNome, publicToken) {
+    return [
+      `Olá, ${clienteNome || 'cliente'}! 👋`,
+      '',
+      'Preparei algumas opções para você escolher a que mais combina com o que precisa.',
+      '',
+      'Você pode comparar os planos e escolher diretamente pelo link:',
+      publicOfferUrl(publicToken),
+    ].join('\n');
+  }
+
+  return {
+    chargeMessage, receiptMessage, reminderMessage, reminderKindFor, publicChargeUrl, publicReceiptUrl,
+    offerMessage, publicOfferUrl,
+  };
 })();

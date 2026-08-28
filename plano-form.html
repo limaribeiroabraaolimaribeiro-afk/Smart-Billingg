@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Novo plano · Smart Billing</title>
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/variables.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/layout.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+<link rel="stylesheet" href="assets/css/pages.css" />
+</head>
+<body>
+
+<div id="page-content">
+  <div class="page-section" style="max-width:720px;">
+    <a href="planos.html" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7M5 12h14"/></svg>
+      <span>Voltar para planos</span>
+    </a>
+
+    <form id="plano-form" class="card card-pad">
+      <div class="card-header__title" id="form-title" style="margin-bottom:4px;">Novo plano</div>
+      <div class="card-header__subtitle" style="margin-bottom:20px;">Defina o preço, a duração e como o plano aparece para o cliente</div>
+
+      <div class="field">
+        <label for="nome">Nome do plano</label>
+        <input class="input" id="nome" placeholder="Ex: Anual" />
+      </div>
+
+      <div class="field-row" style="margin-top:16px;">
+        <div class="field">
+          <label for="descricaoCurta">Descrição curta <span class="optional">(opcional)</span></label>
+          <input class="input" id="descricaoCurta" placeholder="Ex: Flexível" maxlength="60" />
+        </div>
+        <div class="field">
+          <label for="badge">Badge <span class="optional">(opcional)</span></label>
+          <input class="input" id="badge" placeholder="Ex: MAIS ESCOLHIDO" maxlength="30" />
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:16px;">
+        <label for="descricao">Observações / descrição comercial <span class="optional">(opcional)</span></label>
+        <textarea class="textarea" id="descricao" rows="2" placeholder="Detalhes que só aparecem no painel administrativo"></textarea>
+      </div>
+
+      <div class="field" style="margin-top:24px;">
+        <label>Tipo de cobrança</label>
+        <div class="pay-method-grid">
+          <label class="option-toggle" id="tipo-onetime">
+            <input type="radio" name="tipo" value="one_time" checked />
+            <span><span class="option-toggle__title">Pagamento único</span><br/><span class="option-toggle__desc">Cobra 1 vez, serviço dura X meses</span></span>
+          </label>
+          <label class="option-toggle" id="tipo-recorrente">
+            <input type="radio" name="tipo" value="recurring_monthly" />
+            <span><span class="option-toggle__title">Recorrente mensal</span><br/><span class="option-toggle__desc">Renova automaticamente todo mês</span></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field-row" style="margin-top:16px;">
+        <div class="field">
+          <label for="valor">Preço</label>
+          <input class="input" id="valor" placeholder="0,00" inputmode="decimal" />
+        </div>
+        <div class="field">
+          <label for="valorReferencia">Preço de referência <span class="optional">(opcional, "de")</span></label>
+          <input class="input" id="valorReferencia" placeholder="0,00" inputmode="decimal" />
+        </div>
+      </div>
+
+      <div class="field-row" style="margin-top:16px;">
+        <div class="field">
+          <label for="duracaoMeses" id="duracao-label">Duração (meses)</label>
+          <input class="input" id="duracaoMeses" type="number" min="1" step="1" placeholder="12" />
+        </div>
+        <div class="field">
+          <label for="descontoPercent">Desconto (%) <span class="optional">(opcional)</span></label>
+          <input class="input" id="descontoPercent" type="number" min="0" max="100" step="1" placeholder="0" />
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:16px;">
+        <label>Pagamento</label>
+        <div class="pay-method-grid">
+          <label class="option-toggle is-checked" id="method-pix">
+            <input type="checkbox" id="pay-pix" checked />
+            <span><span class="option-toggle__title">Pix</span></span>
+          </label>
+          <label class="option-toggle is-checked" id="method-cartao">
+            <input type="checkbox" id="pay-cartao" checked />
+            <span><span class="option-toggle__title">Cartão</span></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field" id="parcelas-wrap" style="margin-top:16px;">
+        <label for="parcelas">Máximo de parcelas no cartão</label>
+        <select class="select" id="parcelas"></select>
+        <p class="field-hint">A InfinitePay trabalha com no máximo 12x, mesmo em planos de longa duração (ex.: 2 anos não vira 24x).</p>
+      </div>
+
+      <div class="field-row" style="margin-top:24px;">
+        <label class="option-toggle" id="destaque-toggle" style="cursor:pointer;">
+          <input type="checkbox" id="destaque" />
+          <span><span class="option-toggle__title">Destacar este plano</span><br/><span class="option-toggle__desc">Aparece maior/com borda na oferta</span></span>
+        </label>
+        <label class="option-toggle is-checked" id="ativo-toggle" style="cursor:pointer;">
+          <input type="checkbox" id="ativo" checked />
+          <span><span class="option-toggle__title">Plano ativo</span><br/><span class="option-toggle__desc">Planos inativos não aparecem em novas ofertas</span></span>
+        </label>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:28px;">
+        <a href="planos.html" class="btn btn-secondary btn-block">Cancelar</a>
+        <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
+          <span id="submit-btn-label">Criar plano</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/supabase-client.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/plano-form.js"></script>
+</body>
+</html>
