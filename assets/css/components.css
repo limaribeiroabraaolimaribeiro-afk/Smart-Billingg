@@ -620,6 +620,15 @@
 }
 .plan-card:not(.plan-card--inactive):hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 
+/* Enquanto o menu de ações do card está aberto (ver ui.js/toggleMenu), o
+   transform de :hover é zerado: position:fixed em .action-menu (descendente)
+   passa a ser relativo a QUALQUER ancestral com transform ativo em vez do
+   viewport, fazendo o menu — posicionado em JS com coordenadas de
+   viewport — aparecer fora de lugar/atrás dos outros cards. O z-index
+   garante que o próprio card fique acima dos vizinhos enquanto o menu
+   estiver aberto. */
+.plan-card.has-open-menu { transform: none !important; z-index: 30; }
+
 /* Plano em destaque (ex.: Anual) — mesma linguagem de gradiente da marca já
    usada em .public-card__hero / botões primários, nunca uma cor nova. */
 .plan-card--featured {

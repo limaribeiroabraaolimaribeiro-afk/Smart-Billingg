@@ -35,7 +35,7 @@
           <span class="badge ${p.ativo ? 'badge-paid' : 'badge-canceled'}">${p.ativo ? 'Ativo' : 'Inativo'}</span>
           <div class="row-actions">
             <button class="action-btn" data-menu-toggle="${menuId}" aria-label="Ações">${SB_ICON.moreVertical}</button>
-            <div class="action-menu" data-menu="${menuId}" style="right:0;">
+            <div class="action-menu" data-menu="${menuId}">
               <a class="action-menu__item" href="plano-form.html?id=${p.id}">${SB_ICON.edit}<span>Editar</span></a>
               <button class="action-menu__item" data-act="duplicate" data-id="${p.id}">${SB_ICON.copy}<span>Duplicar</span></button>
               <button class="action-menu__item" data-act="toggle" data-id="${p.id}" data-ativo="${p.ativo}">${p.ativo ? SB_ICON.ban : SB_ICON.checkCircle}<span>${p.ativo ? 'Desativar' : 'Ativar'}</span></button>

@@ -181,11 +181,22 @@ const SB_UI = (() => {
   // em toda a página (linhas de tabela e topbar incluídos).
   let _openMenu = null;
   let _openTrigger = null;
+  let _openHost = null;
+
+  // Containers que aplicam transform no :hover (ex.: .plan-card) criam um
+  // novo "containing block" para descendentes com position:fixed — o menu
+  // passa a ser posicionado relativo ao card transformado, não ao viewport,
+  // e as coordenadas calculadas em _positionMenu (viewport-relative) ficam
+  // erradas, fazendo o menu "sumir" atrás dos cards. A classe .has-open-menu
+  // (ver components.css) zera esse transform enquanto o menu está aberto.
+  const MENU_HOST_SELECTOR = '.plan-card';
 
   function _clearMenuPosition(menu) {
     menu.style.position = '';
     menu.style.top = '';
     menu.style.left = '';
+    menu.style.right = '';
+    menu.style.bottom = '';
     menu.style.visibility = '';
   }
 
@@ -194,8 +205,10 @@ const SB_UI = (() => {
       _openMenu.classList.remove('is-open');
       _clearMenuPosition(_openMenu);
     }
+    if (_openHost) _openHost.classList.remove('has-open-menu');
     _openMenu = null;
     _openTrigger = null;
+    _openHost = null;
   }
 
   function _positionMenu(trigger, menu) {
@@ -225,15 +238,28 @@ const SB_UI = (() => {
     menu.style.position = 'fixed';
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
+    // Alguns callers (ex.: planos.js, layout.js) trazem um "right:0" inline
+    // herdado de um layout antigo (absolute relativo ao botão). Com
+    // position:fixed + width:auto, ter left E right definidos ao mesmo tempo
+    // faz o menu esticar até a borda direita do viewport em vez de manter a
+    // largura compacta — por isso sempre zeramos right/bottom aqui.
+    menu.style.right = 'auto';
+    menu.style.bottom = 'auto';
     menu.style.visibility = '';
   }
 
   function toggleMenu(trigger, menu) {
     if (_openMenu === menu) { closeOpenMenu(); return; }
     closeOpenMenu();
+    // Neutraliza o transform do host ANTES de medir/posicionar — senão a
+    // primeira abertura (card já em :hover, já que o mouse está sobre o
+    // botão de 3 pontinhos) mede/posiciona com o containing block errado.
+    const host = trigger.closest(MENU_HOST_SELECTOR);
+    if (host) host.classList.add('has-open-menu');
     _positionMenu(trigger, menu);
     _openMenu = menu;
     _openTrigger = trigger;
+    _openHost = host;
   }
 
   // Fecha/reposiciona em interações globais — registrado uma única vez.
