@@ -146,6 +146,12 @@
   const planoRegion = document.getElementById('plano-region');
   const STATUS_ASSIN_LABEL = { pending: 'Aguardando pagamento', active: 'Ativo', overdue: 'Em atraso', cancelled: 'Cancelado', expired: 'Expirado' };
   const STATUS_ASSIN_TONE = { pending: 'badge-pending', active: 'badge-paid', overdue: 'badge-overdue', cancelled: 'badge-canceled', expired: 'badge-canceled' };
+  const STATUS_OFERTA_LABEL = (o) => o.status === 'selected' ? 'Plano escolhido' : o.status === 'cancelled' ? 'Cancelada' : new Date(o.expiraEm) < new Date() ? 'Expirada' : 'Aguardando escolha';
+
+  // Ofertas do último renderPlano() — usado pelas ações (copiar link/abrir/
+  // WhatsApp) do histórico, que nunca criam uma oferta nova, só reaproveitam
+  // o public_token já salvo.
+  let ofertasCache = [];
 
   async function renderPlano() {
     try {
@@ -153,6 +159,7 @@
         DB.assinaturas.getCurrentForClient(clienteId),
         DB.ofertas.listForClient(clienteId),
       ]);
+      ofertasCache = ofertas;
 
       const blocoAssinatura = assinatura ? `
         <div class="data-card" style="margin-bottom:${ofertas.length ? '16px' : '0'};">
@@ -177,9 +184,20 @@
         <div class="table-cell-muted" style="font-size:12px;font-weight:700;margin-bottom:8px;">Histórico de planos (ofertas enviadas)</div>
         <div class="card-list" style="display:flex;">
           ${ofertas.slice(0, 5).map((o) => `
-            <div class="data-card">
-              <div class="data-card__row"><span class="label">${o.titulo ? SB_UI.escapeHtml(o.titulo) : 'Oferta'}</span><span class="value">${SB_UI.formatDate(o.criadoEm)}</span></div>
-              <div class="data-card__row"><span class="label">Status</span><span class="value">${o.status === 'selected' ? 'Plano escolhido' : o.status === 'cancelled' ? 'Cancelada' : new Date(o.expiraEm) < new Date() ? 'Expirada' : 'Aguardando escolha'}</span></div>
+            <div class="data-card" data-oferta-id="${o.id}">
+              <div class="data-card__top">
+                <span class="table-cell-primary">${o.titulo ? SB_UI.escapeHtml(o.titulo) : 'Oferta'}</span>
+                <div class="row-actions">
+                  <button class="action-btn" data-menu-toggle="oferta-${o.id}" aria-label="Ações da oferta">${SB_ICON.moreVertical}</button>
+                  <div class="action-menu" data-menu="oferta-${o.id}">
+                    <button class="action-menu__item" data-oferta-act="copy" data-id="${o.id}">${SB_ICON.link}<span>Copiar link</span></button>
+                    <button class="action-menu__item" data-oferta-act="open" data-id="${o.id}">${SB_ICON.externalLink}<span>Abrir oferta</span></button>
+                    <button class="action-menu__item" data-oferta-act="whatsapp" data-id="${o.id}">${SB_ICON.whatsapp}<span>Enviar pelo WhatsApp</span></button>
+                  </div>
+                </div>
+              </div>
+              <div class="data-card__row"><span class="label">Criada em</span><span class="value">${SB_UI.formatDate(o.criadoEm)}</span></div>
+              <div class="data-card__row"><span class="label">Status</span><span class="value">${STATUS_OFERTA_LABEL(o)}</span></div>
             </div>`).join('')}
         </div>` : '';
 
@@ -208,6 +226,53 @@
     } catch (err) {
       planoRegion.innerHTML = `<p class="table-cell-muted">Não foi possível carregar o plano deste cliente.</p>`;
     }
+  }
+
+  // Delegado uma única vez em planoRegion (o container em si nunca é
+  // substituído, só o innerHTML) — evita registrar um listener novo a cada
+  // renderPlano() e nunca cria uma oferta nova, só reaproveita o
+  // public_token já salvo em ofertasCache.
+  SB_UI.initActionMenus(planoRegion);
+  planoRegion.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-oferta-act]');
+    if (!btn) return;
+    const oferta = ofertasCache.find((o) => o.id === btn.dataset.id);
+    if (!oferta) return;
+    const act = btn.dataset.ofertaAct;
+    const link = SB_WA.publicOfferUrl(oferta.publicToken);
+
+    if (act === 'copy') {
+      await SB_UI.copyToClipboard(link);
+      SB_UI.toast({ type: 'success', title: 'Link copiado' });
+      return;
+    }
+    if (act === 'open') {
+      window.open(link, '_blank');
+      return;
+    }
+    if (act === 'whatsapp') {
+      SB_UI.closeOpenMenu();
+      const mensagem = SB_WA.offerMessage(cliente.nome, oferta.publicToken);
+      const result = await DB.whatsapp.enqueue({
+        messageType: 'custom',
+        message: mensagem,
+        clientId: clienteId,
+        // timestamp no fim: cada clique é um envio explícito do usuário
+        // (mesmo padrão de actions.js) — uma key fixa faria o segundo envio
+        // da mesma oferta ser deduplicado como se fosse o mesmo evento.
+        idempotencyKey: `plan-offer:${oferta.id}:${Date.now()}`,
+      });
+      if (result.success) {
+        SB_UI.toast({ type: 'success', title: 'Oferta enviada pelo WhatsApp' });
+      } else {
+        window.open(SB_UI.whatsappLink(cliente.whatsapp, mensagem), '_blank');
+      }
+    }
+  });
+
+  function scrollToOferta(ofertaId) {
+    const target = planoRegion.querySelector(`[data-oferta-id="${ofertaId}"]`) || document.getElementById('plano-card');
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   // ---------------- Criação de oferta ----------------
@@ -261,8 +326,7 @@
         <label for="oferta-mensagem">Mensagem <span class="optional">(opcional)</span></label>
         <textarea class="textarea" id="oferta-mensagem" rows="2" placeholder="Mensagem que aparece na página da oferta"></textarea>
       </div>
-      <button type="button" class="btn btn-primary btn-block" id="btn-gerar-oferta" style="margin-top:20px;">Gerar link da oferta</button>
-      <div id="oferta-resultado" style="margin-top:16px;"></div>`;
+      <button type="button" class="btn btn-primary btn-block" id="btn-gerar-oferta" style="margin-top:20px;">Gerar link da oferta</button>`;
 
     ofertaBody.querySelectorAll('#oferta-planos-check .option-toggle input').forEach((inp) => {
       inp.addEventListener('change', () => inp.closest('.option-toggle').classList.toggle('is-checked', inp.checked));
@@ -284,40 +348,20 @@
           mensagem: document.getElementById('oferta-mensagem').value.trim() || null,
           expiraEmDias: Number(document.getElementById('oferta-validade').value) || 7,
         });
-        const link = SB_WA.publicOfferUrl(oferta.publicToken);
-        const mensagemWa = SB_WA.offerMessage(cliente.nome, oferta.publicToken);
-        document.getElementById('oferta-resultado').innerHTML = `
-          <div class="field">
-            <label>Link gerado</label>
-            <div style="display:flex;gap:8px;">
-              <input class="input" id="oferta-link-gerado" value="${SB_UI.escapeHtml(link)}" readonly style="flex:1;" />
-              <button type="button" class="btn btn-secondary" id="btn-copiar-link">Copiar</button>
-            </div>
-          </div>
-          <button type="button" class="btn btn-primary btn-block" id="btn-enviar-whatsapp" style="margin-top:12px;">Enviar pelo WhatsApp</button>`;
-
-        document.getElementById('btn-copiar-link').addEventListener('click', async () => {
-          await SB_UI.copyToClipboard(link);
-          SB_UI.toast({ type: 'success', title: 'Link copiado' });
-        });
-        document.getElementById('btn-enviar-whatsapp').addEventListener('click', async () => {
-          // Mesma fila do resto do sistema (DB.whatsapp.enqueue) — nenhuma
-          // integração paralela de WhatsApp é criada para ofertas.
-          const result = await DB.whatsapp.enqueue({
-            messageType: 'custom',
-            message: mensagemWa,
-            clientId: clienteId,
-            idempotencyKey: `plan-offer:${oferta.id}`,
-          });
-          if (result.success) {
-            SB_UI.toast({ type: 'success', title: 'Oferta enviada pelo WhatsApp' });
-          } else {
-            window.open(SB_UI.whatsappLink(cliente.whatsapp, mensagemWa), '_blank');
-          }
-        });
 
         SB_UI.toast({ type: 'success', title: 'Oferta criada com sucesso' });
-        renderPlano();
+
+        // Fecha e reseta o card/form — a próxima abertura de "Criar oferta"
+        // deve mostrar um formulário limpo, não o resultado desta oferta.
+        // O link/WhatsApp desta oferta ficam disponíveis no histórico logo
+        // abaixo (ações reconstroem o link a partir do public_token salvo,
+        // nunca criam uma oferta nova).
+        ofertaCard.style.display = 'none';
+        ofertaFormLoaded = false;
+        ofertaBody.innerHTML = '';
+
+        await renderPlano();
+        scrollToOferta(oferta.id);
       } catch (err) {
         SB_UI.toast({ type: 'error', title: 'Não foi possível criar a oferta', desc: err?.message || 'Tente novamente.' });
       } finally {
