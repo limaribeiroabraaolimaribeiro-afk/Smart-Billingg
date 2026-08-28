@@ -212,6 +212,12 @@ create trigger trg_client_subscriptions_updated_at before update on public.clien
 -- ---------------- billing_plans ----------------
 alter table public.billing_plans enable row level security;
 
+-- RLS por si só não concede acesso à tabela — sem este grant, todo
+-- authenticated recebe "permission denied for table billing_plans" mesmo
+-- com as policies abaixo corretas. As policies continuam sendo quem decide
+-- quais linhas cada usuário enxerga/altera; o grant só libera a tabela.
+grant select, insert, update, delete on table public.billing_plans to authenticated;
+
 drop policy if exists billing_plans_select_members on public.billing_plans;
 create policy billing_plans_select_members on public.billing_plans
   for select using (public.is_company_member(public.billing_plans.company_id));
@@ -234,6 +240,8 @@ create policy billing_plans_delete_managers on public.billing_plans
 
 -- ---------------- plan_offers ----------------
 alter table public.plan_offers enable row level security;
+
+grant select, insert, update, delete on table public.plan_offers to authenticated;
 
 drop policy if exists plan_offers_select_members on public.plan_offers;
 create policy plan_offers_select_members on public.plan_offers
@@ -260,6 +268,11 @@ create policy plan_offers_delete_managers on public.plan_offers
 
 -- ---------------- client_subscriptions ----------------
 alter table public.client_subscriptions enable row level security;
+
+-- Só select: escrita é exclusiva das funções security definer abaixo (ver
+-- comentário mais abaixo) — authenticated nunca precisa de insert/update/delete
+-- direto nesta tabela.
+grant select on table public.client_subscriptions to authenticated;
 
 drop policy if exists client_subscriptions_select_members on public.client_subscriptions;
 create policy client_subscriptions_select_members on public.client_subscriptions
