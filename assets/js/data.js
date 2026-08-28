@@ -769,8 +769,6 @@ const DB = (() => {
         valor: Number(row.amount),
         vencimento: `${row.due_date}T12:00:00`,
         status: statusFromDb(row),
-        formaPagamento: paymentMethodsToForma(row.payment_methods),
-        parcelas: row.max_installments,
         observacoes: row.notes || '',
         publicToken: row.public_token,
         checkoutUrl: row.checkout_url,
@@ -922,8 +920,6 @@ const DB = (() => {
           valor: Number(row.amount),
           vencimento: `${row.due_date}T12:00:00`,
           status: row.status === 'paid' ? 'pago' : row.status === 'cancelled' ? 'cancelado' : computeEffectiveStatus('pendente', `${row.due_date}T12:00:00`),
-          formaPagamento: paymentMethodsToForma(row.payment_methods),
-          parcelas: row.max_installments,
           checkoutUrl: row.checkout_url,
           pagoEm: row.paid_at,
           cliente: { nome: row.client_name },
@@ -933,17 +929,23 @@ const DB = (() => {
       async create(payload) {
         const companyId = await getCompanyId();
         const userId = await getUserId();
-        const row = unwrap(await client.from('charges').insert({
+        const insertRow = {
           company_id: companyId,
           client_id: payload.clienteId,
           description: payload.descricao,
           amount: payload.valor,
           due_date: String(payload.vencimento).slice(0, 10),
-          payment_methods: formaToPaymentMethods(payload.formaPagamento),
-          max_installments: payload.parcelas || 1,
           notes: payload.observacoes || null,
           created_by: userId,
-        }).select(CHARGE_SELECT).single());
+        };
+        // Só grava payment_methods/max_installments quando o chamador envia
+        // explicitamente (hoje só a importação de dados legados em
+        // Configurações) — o formulário de cobrança não configura mais isso;
+        // sem esses campos, a tabela usa os defaults (pix+cartão, 1x), que
+        // não controlam nada real (a InfinitePay decide isso no checkout).
+        if (payload.formaPagamento !== undefined) insertRow.payment_methods = formaToPaymentMethods(payload.formaPagamento);
+        if (payload.parcelas !== undefined) insertRow.max_installments = payload.parcelas;
+        const row = unwrap(await client.from('charges').insert(insertRow).select(CHARGE_SELECT).single());
 
         const mapped = mapCharge(row);
 

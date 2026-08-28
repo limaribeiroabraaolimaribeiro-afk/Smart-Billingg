@@ -150,9 +150,10 @@
     </div>` : '';
 
   // ---- Payable state (pendente / atrasado) ----
-  const acceptsPix = cobranca.formaPagamento === 'pix' || cobranca.formaPagamento === 'ambos';
-  const acceptsCartao = cobranca.formaPagamento === 'cartao' || cobranca.formaPagamento === 'ambos';
-  const defaultMethod = acceptsPix ? 'pix' : 'cartao';
+  // Forma de pagamento e parcelamento são escolhidos pelo cliente dentro do
+  // checkout da InfinitePay — nunca aqui. Mostrar/deixar escolher isso nesta
+  // página prometeria algo que o clique em "Pagar agora" não cumpre (o
+  // redirecionamento é sempre para o checkout_url já pronto, de qualquer forma).
   const hasCheckout = Boolean(cobranca.checkoutUrl);
 
   region.innerHTML = shell(`
@@ -161,32 +162,13 @@
       ${infoPanel()}
       ${overdueNotice}
 
-      <div class="public-section-title">Forma de pagamento</div>
-      <div class="pay-method-grid">
-        ${acceptsPix ? `
-          <label class="option-toggle ${defaultMethod === 'pix' ? 'is-checked' : ''}" id="method-pix">
-            <input type="radio" name="method" value="pix" ${defaultMethod === 'pix' ? 'checked' : ''} />
-            <span class="option-toggle__icon">${SB_ICON.pix}</span>
-            <span><span class="option-toggle__title">Pix</span><br/><span class="option-toggle__desc">Instantâneo</span></span>
-          </label>` : ''}
-        ${acceptsCartao ? `
-          <label class="option-toggle ${defaultMethod === 'cartao' ? 'is-checked' : ''}" id="method-cartao">
-            <input type="radio" name="method" value="cartao" ${defaultMethod === 'cartao' ? 'checked' : ''} />
-            <span class="option-toggle__icon">${SB_ICON.card}</span>
-            <span><span class="option-toggle__title">Cartão</span><br/><span class="option-toggle__desc">Até ${cobranca.parcelas}x</span></span>
-          </label>` : ''}
-      </div>
-
-      <div class="field installments-select" id="installments-wrap" style="display:${defaultMethod === 'cartao' ? 'block' : 'none'};">
-        <label for="parcelas-select">Parcelamento</label>
-        <select class="select" id="parcelas-select">
-          ${Array.from({ length: cobranca.parcelas || 1 }, (_, i) => i + 1).map((n) => `
-            <option value="${n}">${n}x de ${SB_UI.formatCurrency(cobranca.valor / n)}${n === 1 ? ' à vista' : ''}</option>`).join('')}
-        </select>
+      <div class="secure-note" style="margin-top:var(--space-5);">
+        ${SB_ICON.wallet}
+        <span>Formas de pagamento disponíveis no checkout</span>
       </div>
 
       <button class="btn btn-primary btn-block pay-btn-fixed" id="pay-btn">
-        <span id="pay-btn-label">Pagar agora · ${SB_UI.formatCurrency(cobranca.valor)}</span>
+        <span>Pagar agora · ${SB_UI.formatCurrency(cobranca.valor)}</span>
       </button>
 
       <div class="secure-note">
@@ -196,32 +178,6 @@
     </div>
   `);
   appendFooter();
-
-  document.querySelectorAll('input[name="method"]').forEach((radio) => {
-    radio.addEventListener('change', () => {
-      document.querySelectorAll('.option-toggle').forEach((el) => el.classList.remove('is-checked'));
-      radio.closest('.option-toggle').classList.add('is-checked');
-      document.getElementById('installments-wrap').style.display = radio.value === 'cartao' ? 'block' : 'none';
-      updatePayLabel();
-    });
-  });
-  document.getElementById('parcelas-select')?.addEventListener('change', updatePayLabel);
-
-  function selectedMethod() {
-    return document.querySelector('input[name="method"]:checked')?.value || defaultMethod;
-  }
-
-  function updatePayLabel() {
-    const label = document.getElementById('pay-btn-label');
-    if (selectedMethod() === 'cartao') {
-      const n = Number(document.getElementById('parcelas-select')?.value || 1);
-      label.textContent = n > 1
-        ? `Pagar ${n}x de ${SB_UI.formatCurrency(cobranca.valor / n)}`
-        : `Pagar agora · ${SB_UI.formatCurrency(cobranca.valor)}`;
-    } else {
-      label.textContent = `Pagar agora · ${SB_UI.formatCurrency(cobranca.valor)}`;
-    }
-  }
 
   document.getElementById('pay-btn').addEventListener('click', () => {
     if (!hasCheckout) {

@@ -33,10 +33,6 @@
     descricao: document.getElementById('descricao'),
     valor: document.getElementById('valor'),
     vencimento: document.getElementById('vencimento'),
-    payPix: document.getElementById('pay-pix'),
-    payCartao: document.getElementById('pay-cartao'),
-    parcelasField: document.getElementById('parcelas-field'),
-    parcelas: document.getElementById('parcelas'),
     observacoes: document.getElementById('observacoes'),
     sendWhatsapp: document.getElementById('send-whatsapp'),
     sendEmail: document.getElementById('send-email'),
@@ -64,17 +60,6 @@
 
   toggleNewClientBtn.addEventListener('click', () => setUsingNewClient(!usingNewClient));
 
-  function updatePaymentToggleUI() {
-    document.getElementById('opt-pix').classList.toggle('is-checked', els.payPix.checked);
-    document.getElementById('opt-cartao').classList.toggle('is-checked', els.payCartao.checked);
-    els.parcelasField.style.display = els.payCartao.checked ? 'block' : 'none';
-  }
-
-  [els.payPix, els.payCartao].forEach((el) => el.addEventListener('change', () => {
-    updatePaymentToggleUI();
-    renderSummary();
-  }));
-
   ['input', 'change'].forEach((evt) => {
     form.addEventListener(evt, (e) => {
       if (e.target.closest('.form-steps')) renderSummary();
@@ -92,13 +77,6 @@
     const raw = els.valor.value.replace(/\./g, '').replace(',', '.').trim();
     const n = parseFloat(raw);
     return Number.isFinite(n) ? n : 0;
-  }
-
-  function formaPagamentoLabel() {
-    if (els.payPix.checked && els.payCartao.checked) return 'Pix e Cartão';
-    if (els.payPix.checked) return 'Pix';
-    if (els.payCartao.checked) return 'Cartão';
-    return '—';
   }
 
   function renderSummary() {
@@ -119,8 +97,6 @@
       <div class="summary-row"><span class="label">Cliente</span><span class="value">${SB_UI.escapeHtml(nome || '—')}</span></div>
       <div class="summary-row"><span class="label">Descrição</span><span class="value">${SB_UI.escapeHtml(els.descricao.value || '—')}</span></div>
       <div class="summary-row"><span class="label">Vencimento</span><span class="value">${els.vencimento.value ? SB_UI.formatDate(els.vencimento.value + 'T12:00:00') : '—'}</span></div>
-      <div class="summary-row"><span class="label">Pagamento</span><span class="value">${formaPagamentoLabel()}</span></div>
-      ${els.payCartao.checked ? `<div class="summary-row"><span class="label">Parcelamento</span><span class="value">até ${els.parcelas.value}x de ${SB_UI.formatCurrency(valor / Number(els.parcelas.value || 1))}</span></div>` : ''}
       <div class="summary-total"><span class="label">Valor total</span><span class="value">${SB_UI.formatCurrency(valor)}</span></div>
     `;
   }
@@ -153,10 +129,6 @@
     if (!els.descricao.value.trim()) { setError(els.descricao, 'Descreva a cobrança.'); valid = false; }
     if (parseValor() <= 0) { setError(els.valor, 'Informe um valor válido.'); valid = false; }
     if (!els.vencimento.value) { setError(els.vencimento, 'Selecione a data de vencimento.'); valid = false; }
-    if (!els.payPix.checked && !els.payCartao.checked) {
-      SB_UI.toast({ type: 'error', title: 'Selecione ao menos uma forma de pagamento' });
-      valid = false;
-    }
 
     return valid;
   }
@@ -166,7 +138,6 @@
       if (preselectClienteId && clientes.some((c) => c.id === preselectClienteId)) {
         clienteSelect.value = preselectClienteId;
       }
-      updatePaymentToggleUI();
       renderSummary();
       return;
     }
@@ -181,13 +152,9 @@
       els.descricao.value = cob.descricao;
       els.valor.value = String(cob.valor).replace('.', ',');
       els.vencimento.value = cob.vencimento.slice(0, 10);
-      els.payPix.checked = cob.formaPagamento === 'pix' || cob.formaPagamento === 'ambos';
-      els.payCartao.checked = cob.formaPagamento === 'cartao' || cob.formaPagamento === 'ambos';
-      els.parcelas.value = String(cob.parcelas || 1);
       els.observacoes.value = cob.observacoes || '';
       els.sendWhatsapp.checked = Boolean(cob.enviarWhatsapp);
       els.sendEmail.checked = Boolean(cob.enviarEmail);
-      updatePaymentToggleUI();
       renderSummary();
     } catch (err) {
       SB_UI.toast({ type: 'error', title: 'Erro ao carregar cobrança' });
@@ -217,14 +184,11 @@
         clienteId = novoCliente.id;
       }
 
-      const formaPagamento = els.payPix.checked && els.payCartao.checked ? 'ambos' : (els.payPix.checked ? 'pix' : 'cartao');
       const payload = {
         clienteId,
         descricao: els.descricao.value.trim(),
         valor: parseValor(),
         vencimento: new Date(`${els.vencimento.value}T12:00:00`).toISOString(),
-        formaPagamento,
-        parcelas: els.payCartao.checked ? Number(els.parcelas.value) : 1,
         observacoes: els.observacoes.value.trim(),
         enviarWhatsapp: els.sendWhatsapp.checked,
         enviarEmail: els.sendEmail.checked,
