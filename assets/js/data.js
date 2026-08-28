@@ -1269,8 +1269,6 @@ const DB = (() => {
         tipoCobranca: row.billing_type,
         badge: row.badge || '',
         destaque: !!row.featured,
-        formaPagamento: paymentMethodsToForma(row.payment_methods),
-        parcelas: row.max_installments,
         ativo: !!row.active,
         ordem: row.sort_order,
         observacoes: row.notes || '',
@@ -1279,7 +1277,12 @@ const DB = (() => {
       };
     }
 
-    const PLANO_SELECT = 'id, company_id, name, description, short_description, amount, reference_amount, discount_percent, duration_months, billing_type, badge, featured, payment_methods, max_installments, active, sort_order, notes, created_at, updated_at';
+    // payment_methods/max_installments continuam existindo na tabela (default
+    // pix+cartão / 1x) mas não controlam nada real — a InfinitePay decide
+    // forma de pagamento e parcelamento no próprio checkout (ver
+    // docs/PLANOS_E_ASSINATURAS.md). Por isso o frontend de Planos não lê
+    // nem grava mais esses dois campos.
+    const PLANO_SELECT = 'id, company_id, name, description, short_description, amount, reference_amount, discount_percent, duration_months, billing_type, badge, featured, active, sort_order, notes, created_at, updated_at';
 
     function planoToRow(payload) {
       const row = {};
@@ -1293,8 +1296,6 @@ const DB = (() => {
       if (payload.tipoCobranca !== undefined) row.billing_type = payload.tipoCobranca;
       if (payload.badge !== undefined) row.badge = payload.badge || null;
       if (payload.destaque !== undefined) row.featured = payload.destaque;
-      if (payload.formaPagamento !== undefined) row.payment_methods = formaToPaymentMethods(payload.formaPagamento);
-      if (payload.parcelas !== undefined) row.max_installments = payload.parcelas;
       if (payload.ativo !== undefined) row.active = payload.ativo;
       if (payload.ordem !== undefined) row.sort_order = payload.ordem;
       if (payload.observacoes !== undefined) row.notes = payload.observacoes || null;
@@ -1376,7 +1377,7 @@ const DB = (() => {
           id: p.id, nome: p.name, descricao: p.description, descricaoCurta: p.short_description,
           valor: Number(p.amount), valorReferencia: p.reference_amount != null ? Number(p.reference_amount) : null,
           descontoPercent: Number(p.discount_percent || 0), duracaoMeses: p.duration_months, tipoCobranca: p.billing_type,
-          badge: p.badge || '', destaque: !!p.featured, formaPagamento: paymentMethodsToForma(p.payment_methods), parcelas: p.max_installments,
+          badge: p.badge || '', destaque: !!p.featured,
         })),
       };
     }

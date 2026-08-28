@@ -33,22 +33,9 @@
     valorReferencia: document.getElementById('valorReferencia'),
     duracaoMeses: document.getElementById('duracaoMeses'),
     descontoPercent: document.getElementById('descontoPercent'),
-    parcelas: document.getElementById('parcelas'),
-    payPix: document.getElementById('pay-pix'),
-    payCartao: document.getElementById('pay-cartao'),
     destaque: document.getElementById('destaque'),
     ativo: document.getElementById('ativo'),
   };
-
-  // Máximo 12 parcelas — a InfinitePay não confirma suporte a mais que isso
-  // nesta integração (ver docs/PLANOS_E_ASSINATURAS.md).
-  for (let n = 1; n <= 12; n++) {
-    const opt = document.createElement('option');
-    opt.value = String(n);
-    opt.textContent = n === 1 ? '1x (à vista)' : `${n}x`;
-    els.parcelas.appendChild(opt);
-  }
-  els.parcelas.value = '12';
 
   function wireToggle(inputEl) {
     const label = inputEl.closest('.option-toggle');
@@ -56,7 +43,7 @@
     inputEl.addEventListener('change', sync);
     sync();
   }
-  [els.payPix, els.payCartao, els.destaque, els.ativo].forEach(wireToggle);
+  [els.destaque, els.ativo].forEach(wireToggle);
   document.querySelectorAll('input[name="tipo"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       document.querySelectorAll('#tipo-onetime, #tipo-recorrente').forEach((el) => el.classList.remove('is-checked'));
@@ -106,10 +93,6 @@
     }
     const duracao = Number(els.duracaoMeses.value);
     if (!Number.isFinite(duracao) || duracao < 1) { setError(els.duracaoMeses, 'Informe a duração em meses.'); valid = false; }
-    if (!els.payPix.checked && !els.payCartao.checked) {
-      SB_UI.toast({ type: 'error', title: 'Selecione ao menos uma forma de pagamento' });
-      valid = false;
-    }
     return valid;
   }
 
@@ -122,13 +105,10 @@
     els.valorReferencia.value = p.valorReferencia != null ? String(p.valorReferencia).replace('.', ',') : '';
     els.duracaoMeses.value = p.duracaoMeses;
     els.descontoPercent.value = p.descontoPercent || 0;
-    els.parcelas.value = String(p.parcelas || 12);
-    els.payPix.checked = p.formaPagamento === 'pix' || p.formaPagamento === 'ambos';
-    els.payCartao.checked = p.formaPagamento === 'cartao' || p.formaPagamento === 'ambos';
     els.destaque.checked = !!p.destaque;
     els.ativo.checked = p.ativo !== false;
     document.querySelector(`input[name="tipo"][value="${p.tipoCobranca}"]`).checked = true;
-    [els.payPix, els.payCartao, els.destaque, els.ativo].forEach((inp) => inp.closest('.option-toggle').classList.toggle('is-checked', inp.checked));
+    [els.destaque, els.ativo].forEach((inp) => inp.closest('.option-toggle').classList.toggle('is-checked', inp.checked));
     document.getElementById('tipo-onetime').classList.toggle('is-checked', p.tipoCobranca === 'one_time');
     document.getElementById('tipo-recorrente').classList.toggle('is-checked', p.tipoCobranca === 'recurring_monthly');
     updateDuracaoLabel();
@@ -157,8 +137,6 @@
     const submitBtn = document.getElementById('submit-btn');
     submitBtn.disabled = true;
 
-    const formaPagamento = els.payPix.checked && els.payCartao.checked ? 'ambos' : (els.payCartao.checked ? 'cartao' : 'pix');
-
     const payload = {
       nome: els.nome.value.trim(),
       descricaoCurta: els.descricaoCurta.value.trim(),
@@ -169,8 +147,6 @@
       duracaoMeses: Number(els.duracaoMeses.value),
       descontoPercent: Number(els.descontoPercent.value) || 0,
       tipoCobranca: document.querySelector('input[name="tipo"]:checked').value,
-      formaPagamento,
-      parcelas: Number(els.parcelas.value),
       destaque: els.destaque.checked,
       ativo: els.ativo.checked,
     };
