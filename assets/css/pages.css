@@ -325,40 +325,263 @@
 .rank-row__value { font-weight: 800; font-size: 12.5px; }
 
 /* ==========================================================================
-   Página pública da oferta de planos (oferta.html) — reaproveita o mesmo
-   fundo em gradiente navy de .public-page, mas com um container mais largo
-   (comporta até 3 plan-cards lado a lado) em vez do .public-card único de
-   440px usado pela cobrança avulsa.
+   Página pública da oferta de planos (oferta.html) — landing page premium,
+   independente do .plan-card usado no painel administrativo (planos.js):
+   nenhuma classe abaixo é compartilhada com outras páginas, então este
+   redesign não afeta a listagem interna de Planos.
    ========================================================================== */
 .offer-page {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
-  background: var(--gradient-navy);
+  overflow-x: clip;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: var(--space-8) var(--space-4);
+  padding: var(--space-10) var(--space-4) var(--space-12);
+  background: #05060f;
+  color: #fff;
+
+  /* Tokens só desta página — não vazam para o resto do app (light theme). */
+  --offer-gold: #f0c869;
+  --offer-gold-soft: #fde9b8;
+  --offer-gold-deep: #b9862c;
+  --offer-purple: #a78bfa;
+  --offer-purple-deep: #7c3aed;
+  --offer-card-bg: linear-gradient(165deg, #14172f 0%, #08091a 100%);
+  --offer-border: rgba(255, 255, 255, 0.09);
+  --offer-text-dim: rgba(226, 232, 255, 0.62);
 }
-.offer-wrap { width: 100%; max-width: 1080px; }
+/* Glow ambiente + leve textura de pontos — camadas fixas atrás do conteúdo
+   (position:fixed cobre a viewport inteira mesmo com a página rolando). */
+.offer-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% -5%, rgba(240, 200, 105, 0.16), transparent 40%),
+    radial-gradient(circle at 88% 8%, rgba(139, 92, 246, 0.22), transparent 45%),
+    radial-gradient(circle at 50% 105%, rgba(37, 40, 90, 0.55), transparent 55%);
+}
+.offer-page::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.5) 1px, transparent 1.5px);
+  background-size: 28px 28px;
+  opacity: 0.05;
+}
+.offer-wrap { position: relative; z-index: 1; width: 100%; max-width: 1120px; }
 
-.offer-header { text-align: center; margin-bottom: var(--space-8); color: #fff; }
-.offer-header__logo { height: 26px; width: auto; margin-bottom: var(--space-5); mix-blend-mode: screen; }
-.offer-header__greeting { font-size: 14px; font-weight: 600; color: rgba(255,255,255,.75); margin-bottom: 6px; }
-.offer-header__title { font-size: clamp(24px, 6vw, 34px); font-weight: 800; letter-spacing: -0.01em; margin-bottom: 8px; }
-.offer-header__subtitle { font-size: 15px; color: rgba(255,255,255,.75); font-weight: 500; }
-.offer-header__message { margin-top: var(--space-4); font-size: 13.5px; color: rgba(255,255,255,.85); max-width: 480px; margin-left: auto; margin-right: auto; }
+/* ---------- Header ---------- */
+.offer-header { text-align: center; margin-bottom: var(--space-10); }
 
-/* Cards com fundo claro sobre o navy — precisa de sombra mais forte para
-   descolar do fundo escuro (mesma var(--shadow-lg) já usada em .public-card). */
-.offer-wrap .plan-card { box-shadow: var(--shadow-lg); }
-.offer-wrap .plan-card--featured { box-shadow: 0 12px 40px rgba(124, 58, 237, 0.35); }
+/* Marca em HTML/CSS (ícone SVG + texto), não a logo.png com mix-blend-mode
+   usada em outras páginas públicas: dentro do stacking context isolado por
+   z-index de .offer-wrap (necessário pra ficar acima do glow de fundo), o
+   blend do PNG passa a comparar contra um backdrop transparente e sobra uma
+   caixa escura visível — o ícone SVG (fundo transparente de verdade) não
+   tem esse problema. */
+.offer-brand { display: flex; align-items: center; justify-content: center; gap: 9px; margin-bottom: var(--space-6); }
+.offer-brand__icon { width: 26px; height: 26px; display: block; }
+.offer-brand__text { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; color: #fff; }
+.offer-brand__text strong {
+  font-weight: 800;
+  background: linear-gradient(120deg, var(--blue-400), var(--offer-purple));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.offer-header__greeting {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+  color: var(--offer-gold); margin-bottom: var(--space-4);
+}
+.offer-header__title {
+  font-size: clamp(28px, 6.5vw, 44px);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
+  margin-bottom: var(--space-4);
+}
+.offer-header__title-accent {
+  background: linear-gradient(120deg, var(--offer-gold-soft), var(--offer-gold) 55%, var(--offer-gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.offer-header__subtitle {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--offer-text-dim);
+}
+.offer-header__subtitle::before,
+.offer-header__subtitle::after {
+  content: ""; width: 32px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--offer-gold-deep));
+}
+.offer-header__subtitle::after { background: linear-gradient(90deg, var(--offer-gold-deep), transparent); }
+.offer-header__message {
+  margin: var(--space-5) auto 0; max-width: 480px;
+  font-size: 14px; line-height: 1.5; color: var(--offer-text-dim);
+}
 
-/* CTA com altura mínima confortável de toque (~48px) — a oferta é aberta
-   principalmente pelo WhatsApp no celular. */
-.plan-card__cta .btn { min-height: 48px; font-size: 15px; }
+/* ---------- Grid de planos ---------- */
+.offer-plan-grid {
+  position: relative; z-index: 1;
+  display: grid;
+  gap: var(--space-6);
+  align-items: end;
+}
+.offer-plan-grid[data-count="1"] { grid-template-columns: minmax(0, 380px); justify-content: center; }
+.offer-plan-grid[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 720px; margin: 0 auto; }
+.offer-plan-grid[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.offer-plan-grid[data-count="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 980px) {
+  .offer-plan-grid[data-count="3"],
+  .offer-plan-grid[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 720px; margin: 0 auto; }
+}
+@media (max-width: 640px) {
+  .offer-plan-grid { grid-template-columns: 1fr !important; max-width: 420px; margin: 0 auto; }
+}
 
-.offer-state-card { width: 100%; max-width: 440px; margin: 0 auto; background: var(--bg-surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); overflow: hidden; }
+/* ---------- Card ---------- */
+.offer-plan-card {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: var(--space-3);
+  background: var(--offer-card-bg);
+  border: 1px solid var(--offer-border);
+  border-radius: 22px;
+  padding: 44px var(--space-5) var(--space-6);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.45);
+  opacity: 0; transform: translateY(28px);
+  animation: offerCardIn 0.65s var(--ease-out) forwards;
+}
+.offer-plan-card:nth-child(1) { animation-delay: 0.05s; }
+.offer-plan-card:nth-child(2) { animation-delay: 0.16s; }
+.offer-plan-card:nth-child(3) { animation-delay: 0.27s; }
+.offer-plan-card:nth-child(4) { animation-delay: 0.38s; }
+@keyframes offerCardIn { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .offer-plan-card { opacity: 1; transform: none; animation: none; }
+}
+@media (hover: hover) {
+  .offer-plan-card { transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base); }
+  .offer-plan-card:hover { transform: translateY(-6px); border-color: rgba(255, 255, 255, 0.2); box-shadow: 0 32px 64px rgba(0, 0, 0, 0.5); }
+}
+
+.offer-plan-card--featured {
+  border-color: rgba(240, 200, 105, 0.55);
+  box-shadow: 0 0 0 1px rgba(240, 200, 105, 0.35), 0 30px 64px rgba(240, 200, 105, 0.2);
+  z-index: 2;
+}
+.offer-plan-card--accent {
+  border-color: rgba(167, 139, 250, 0.45);
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.25), 0 24px 54px rgba(124, 58, 237, 0.2);
+}
+@media (min-width: 641px) {
+  .offer-plan-card--featured { margin-top: -24px; padding-top: 56px; padding-bottom: calc(var(--space-6) + 8px); }
+}
+@media (hover: hover) {
+  .offer-plan-card--featured:hover { transform: translateY(-14px); box-shadow: 0 0 0 1px rgba(240, 200, 105, 0.55), 0 40px 76px rgba(240, 200, 105, 0.3); }
+  .offer-plan-card--accent:hover { box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.5), 0 32px 64px rgba(124, 58, 237, 0.3); }
+}
+
+.offer-plan-card__badge {
+  position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 18px; border-radius: var(--radius-pill);
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  white-space: nowrap; box-shadow: 0 10px 22px rgba(0, 0, 0, 0.4);
+}
+.offer-plan-card__badge--gold { background: linear-gradient(135deg, var(--offer-gold-soft), var(--offer-gold) 55%, var(--offer-gold-deep)); color: #3a2a06; }
+.offer-plan-card__badge--purple { background: linear-gradient(135deg, #ddd6fe, var(--offer-purple) 60%, var(--offer-purple-deep)); color: #fff; }
+
+.offer-plan-card__icon {
+  width: 54px; height: 54px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 2px;
+}
+.offer-plan-card__icon svg { width: 22px; height: 22px; }
+.offer-plan-card--featured .offer-plan-card__icon { color: var(--offer-gold); border-color: rgba(240, 200, 105, 0.55); box-shadow: 0 0 20px rgba(240, 200, 105, 0.3); }
+.offer-plan-card--accent .offer-plan-card__icon { color: var(--offer-purple); border-color: rgba(167, 139, 250, 0.55); box-shadow: 0 0 20px rgba(124, 58, 237, 0.3); }
+
+.offer-plan-card__name { font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
+.offer-plan-card__name::after {
+  content: ""; display: block; width: 26px; height: 2px; margin: 9px auto 0;
+  background: rgba(255, 255, 255, 0.2); border-radius: 2px;
+}
+.offer-plan-card--featured .offer-plan-card__name::after { background: var(--offer-gold); }
+.offer-plan-card--accent .offer-plan-card__name::after { background: var(--offer-purple); }
+
+.offer-plan-card__discount {
+  font-size: 11.5px; font-weight: 800; padding: 4px 14px; border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.8);
+}
+.offer-plan-card--featured .offer-plan-card__discount { background: rgba(240, 200, 105, 0.16); color: var(--offer-gold); }
+.offer-plan-card--accent .offer-plan-card__discount { background: rgba(167, 139, 250, 0.18); color: var(--offer-purple); }
+
+.offer-plan-card__reference { font-size: 13px; color: rgba(255, 255, 255, 0.4); text-decoration: line-through; }
+.offer-plan-card__price { font-size: clamp(30px, 7.5vw, 40px); font-weight: 800; letter-spacing: -0.02em; color: #fff; }
+.offer-plan-card__price span { font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.5); }
+
+.offer-plan-card__rows {
+  width: 100%; display: flex; flex-direction: column; gap: 9px;
+  margin-top: 2px; padding-top: var(--space-4); border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+.offer-plan-card__row { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12.5px; color: rgba(255, 255, 255, 0.65); }
+.offer-plan-card__row svg { width: 15px; height: 15px; flex-shrink: 0; color: rgba(255, 255, 255, 0.4); }
+.offer-plan-card__row strong { color: #fff; font-weight: 700; }
+
+.offer-plan-card__desc { font-size: 12.5px; color: rgba(255, 255, 255, 0.55); }
+
+.offer-plan-card__cta { width: 100%; margin-top: auto; padding-top: var(--space-2); }
+.offer-plan-card__btn {
+  width: 100%; min-height: 50px; padding: 14px 18px; border-radius: 14px;
+  font-size: 15px; font-weight: 800; font-family: inherit;
+  border: none; cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast);
+}
+.offer-plan-card__btn--default { background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255, 255, 255, 0.18); }
+.offer-plan-card__btn--featured { background: linear-gradient(135deg, var(--offer-gold-soft), var(--offer-gold) 55%, #c99a34); color: #241a03; box-shadow: 0 14px 30px rgba(240, 200, 105, 0.35); }
+.offer-plan-card__btn--accent { background: linear-gradient(135deg, #c4b5fd, var(--offer-purple-deep) 65%, #5b21b6); color: #fff; box-shadow: 0 14px 30px rgba(124, 58, 237, 0.35); }
+@media (hover: hover) {
+  .offer-plan-card__btn:not(:disabled):hover { transform: translateY(-2px); filter: brightness(1.08); }
+}
+.offer-plan-card__btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+/* ---------- Rodapé ---------- */
+.offer-footer-note {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  margin-top: var(--space-10); font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.45);
+}
+.offer-footer-note svg { width: 15px; height: 15px; color: var(--offer-gold); }
+
+.offer-brand--footer { margin-top: var(--space-6); margin-bottom: 0; opacity: 0.7; transform: scale(0.85); }
+
+/* ---------- Estados (expirada / cancelada / erro / já escolhida) ---------- */
+.offer-state-card {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 440px; margin: 0 auto;
+  background: var(--offer-card-bg);
+  border: 1px solid var(--offer-border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.offer-state-card .state-block__title { color: #fff; }
+.offer-state-card .state-block__desc { color: rgba(255, 255, 255, 0.6); }
+.offer-state-card .state-block__icon { background: rgba(255, 255, 255, 0.06); }
 
 @media (max-width: 480px) {
-  .offer-page { padding: var(--space-6) var(--space-3); }
-  .offer-header { margin-bottom: var(--space-6); }
+  .offer-page { padding: var(--space-8) var(--space-3) var(--space-10); }
+  .offer-header { margin-bottom: var(--space-8); }
+  .offer-plan-card { padding: 40px var(--space-4) var(--space-5); }
 }

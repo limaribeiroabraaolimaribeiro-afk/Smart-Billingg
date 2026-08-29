@@ -34,11 +34,15 @@
     }
   }
 
+  const brandHtml = `
+    <div class="offer-brand">
+      <img class="offer-brand__icon" src="assets/img/logo.svg" alt="" />
+      <span class="offer-brand__text">Smart <strong>Billing</strong></span>
+    </div>`;
+
   function stateShell(inner) {
     region.innerHTML = `
-      <div class="offer-header">
-        <img class="offer-header__logo" src="assets/img/logo.png" alt="Smart Billing" />
-      </div>
+      <div class="offer-header">${brandHtml}</div>
       <div class="offer-state-card">${inner}</div>`;
   }
 
@@ -108,29 +112,40 @@
   }
 
   // ---- Estado normal: oferecer os planos ----
-  const TIPO_LABEL = { one_time: 'pagamento único', recurring_monthly: 'cobrança mensal' };
-
   function moneyPerMonth(p) {
     if (p.tipoCobranca === 'recurring_monthly') return null;
     if (!p.duracaoMeses || p.duracaoMeses <= 1) return null;
     return p.valor / p.duracaoMeses;
   }
 
+  // Hierarquia visual dinâmica (não depende do texto do badge, só de campos
+  // já existentes): plano com destaque=true vira o card de ouro/featured;
+  // qualquer outro plano com badge preenchido vira o card roxo/accent; sem
+  // badge, card neutro — mesma lógica pra 1, 2, 3 ou 4 planos.
   function planCardHtml(p) {
     const equivalente = moneyPerMonth(p);
     const economia = p.valorReferencia != null ? p.valorReferencia - p.valor : null;
+    const isFeatured = !!p.destaque;
+    const isAccent = !isFeatured && Boolean(p.badge);
+    const tone = isFeatured ? 'featured' : isAccent ? 'accent' : 'default';
+    const hasRows = equivalente != null || (economia != null && economia > 0);
+
     return `
-      <div class="plan-card ${p.destaque ? 'plan-card--featured' : ''}" data-plan-id="${p.id}">
-        ${p.badge ? `<span class="plan-card__badge">${SB_UI.escapeHtml(p.badge)}</span>` : ''}
-        <div class="plan-card__name">${SB_UI.escapeHtml(p.nome)}</div>
-        ${p.descontoPercent > 0 ? `<div class="plan-card__discount">${p.descontoPercent}% OFF</div>` : ''}
-        ${p.valorReferencia != null ? `<div class="plan-card__reference">${SB_UI.formatCurrency(p.valorReferencia)}</div>` : ''}
-        <div class="plan-card__price">${SB_UI.formatCurrency(p.valor)}${p.tipoCobranca === 'recurring_monthly' ? '<span>/mês</span>' : ''}</div>
-        ${equivalente != null ? `<div class="plan-card__equivalent">equivale a ${SB_UI.formatCurrency(equivalente)}/mês</div>` : ''}
-        ${economia != null && economia > 0 ? `<div class="plan-card__savings">Economize ${SB_UI.formatCurrency(economia)}</div>` : ''}
-        ${p.descricaoCurta ? `<div class="plan-card__desc">${SB_UI.escapeHtml(p.descricaoCurta)}</div>` : `<div class="plan-card__desc">${TIPO_LABEL[p.tipoCobranca] || ''}</div>`}
-        <div class="plan-card__cta">
-          <button type="button" class="btn ${p.destaque ? 'btn-primary' : 'btn-secondary'} btn-block" data-choose="${p.id}">
+      <div class="offer-plan-card ${isFeatured ? 'offer-plan-card--featured' : isAccent ? 'offer-plan-card--accent' : ''}" data-plan-id="${p.id}">
+        ${p.badge ? `<span class="offer-plan-card__badge offer-plan-card__badge--${isFeatured ? 'gold' : 'purple'}">${SB_UI.escapeHtml(p.badge)}</span>` : ''}
+        <div class="offer-plan-card__icon">${SB_ICON.calendar}</div>
+        <div class="offer-plan-card__name">${SB_UI.escapeHtml(p.nome)}</div>
+        ${p.descontoPercent > 0 ? `<div class="offer-plan-card__discount">${p.descontoPercent}% OFF</div>` : ''}
+        ${p.valorReferencia != null ? `<div class="offer-plan-card__reference">${SB_UI.formatCurrency(p.valorReferencia)}</div>` : ''}
+        <div class="offer-plan-card__price">${SB_UI.formatCurrency(p.valor)}${p.tipoCobranca === 'recurring_monthly' ? '<span>/mês</span>' : ''}</div>
+        ${hasRows ? `
+          <div class="offer-plan-card__rows">
+            ${equivalente != null ? `<div class="offer-plan-card__row">${SB_ICON.trendUp}<span>equivale a <strong>${SB_UI.formatCurrency(equivalente)}/mês</strong></span></div>` : ''}
+            ${economia != null && economia > 0 ? `<div class="offer-plan-card__row">${SB_ICON.wallet}<span>Economize <strong>${SB_UI.formatCurrency(economia)}</strong></span></div>` : ''}
+          </div>` : ''}
+        ${p.descricaoCurta ? `<div class="offer-plan-card__desc">${SB_UI.escapeHtml(p.descricaoCurta)}</div>` : ''}
+        <div class="offer-plan-card__cta">
+          <button type="button" class="offer-plan-card__btn offer-plan-card__btn--${tone}" data-choose="${p.id}">
             Escolher ${SB_UI.escapeHtml(p.nome).toLowerCase()}
           </button>
         </div>
@@ -142,17 +157,25 @@
     return;
   }
 
+  const tituloHtml = oferta.titulo
+    ? SB_UI.escapeHtml(oferta.titulo)
+    : `Escolha o <span class="offer-header__title-accent">plano ideal</span> para você`;
+  const tagline = oferta.mensagem || 'Escolha a opção que melhor combina com você. Quanto maior o período, maior a economia.';
+  const gridCount = Math.min(Math.max(oferta.planos.length, 1), 4);
+
   region.innerHTML = `
     <div class="offer-header">
-      <img class="offer-header__logo" src="assets/img/logo.png" alt="Smart Billing" />
+      ${brandHtml}
       ${oferta.clienteNome ? `<div class="offer-header__greeting">Olá, ${SB_UI.escapeHtml(oferta.clienteNome)}! 👋</div>` : ''}
-      <div class="offer-header__title">${oferta.titulo ? SB_UI.escapeHtml(oferta.titulo) : 'Escolha o plano ideal'}</div>
+      <div class="offer-header__title">${tituloHtml}</div>
       <div class="offer-header__subtitle">Mais tempo, mais economia</div>
-      ${oferta.mensagem ? `<div class="offer-header__message">${SB_UI.escapeHtml(oferta.mensagem)}</div>` : ''}
+      <div class="offer-header__message">${SB_UI.escapeHtml(tagline)}</div>
     </div>
-    <div class="plan-grid">${oferta.planos.map(planCardHtml).join('')}</div>
-    <div class="public-footer-logo">
-      <img class="public-footer-logo__wordmark" src="assets/img/logo.png" alt="Smart Billing" />
+    <div class="offer-plan-grid" data-count="${gridCount}">${oferta.planos.map(planCardHtml).join('')}</div>
+    <div class="offer-footer-note">${SB_ICON.shield}<span>Formas de pagamento disponíveis no checkout.</span></div>
+    <div class="offer-brand offer-brand--footer">
+      <img class="offer-brand__icon" src="assets/img/logo.svg" alt="" />
+      <span class="offer-brand__text">Smart <strong>Billing</strong></span>
     </div>`;
 
   let processing = false;
