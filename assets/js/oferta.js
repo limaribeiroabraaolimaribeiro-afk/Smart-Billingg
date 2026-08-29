@@ -165,6 +165,18 @@
     return;
   }
 
+  // Ordem comercial fixa (Mensal → Semestral → Anual → 2 anos): recorrentes
+  // mensais primeiro, depois pagamento único crescente por duração — nunca
+  // pelo nome do plano. Só reordena a fileira; o destaque visual (dourado,
+  // glow, altura) continua vindo exclusivamente de plano.destaque, então o
+  // featured não muda de posição por causa disso.
+  oferta.planos = [...oferta.planos].sort((a, b) => {
+    const tipoA = a.tipoCobranca === 'recurring_monthly' ? 0 : 1;
+    const tipoB = b.tipoCobranca === 'recurring_monthly' ? 0 : 1;
+    if (tipoA !== tipoB) return tipoA - tipoB;
+    return (a.duracaoMeses || 0) - (b.duracaoMeses || 0);
+  });
+
   const tituloHtml = oferta.titulo
     ? `<span class="offer-header__title-line1">${SB_UI.escapeHtml(oferta.titulo)}</span>`
     : `<span class="offer-header__title-line1">Escolha o</span><span class="offer-header__title-line2">plano ideal</span>`;
