@@ -130,20 +130,28 @@
     const tone = isFeatured ? 'featured' : isAccent ? 'accent' : 'default';
     const hasRows = equivalente != null || (economia != null && economia > 0);
 
+    const badgeIcon = isFeatured ? SB_ICON.star : SB_ICON.diamond;
+
     return `
       <div class="offer-plan-card ${isFeatured ? 'offer-plan-card--featured' : isAccent ? 'offer-plan-card--accent' : ''}" data-plan-id="${p.id}">
-        ${p.badge ? `<span class="offer-plan-card__badge offer-plan-card__badge--${isFeatured ? 'gold' : 'purple'}">${SB_UI.escapeHtml(p.badge)}</span>` : ''}
+        ${p.badge ? `<span class="offer-plan-card__badge offer-plan-card__badge--${isFeatured ? 'gold' : 'purple'}">${badgeIcon}${SB_UI.escapeHtml(p.badge)}</span>` : ''}
         <div class="offer-plan-card__icon">${SB_ICON.calendar}</div>
         <div class="offer-plan-card__name">${SB_UI.escapeHtml(p.nome)}</div>
         ${p.descontoPercent > 0 ? `<div class="offer-plan-card__discount">${p.descontoPercent}% OFF</div>` : ''}
-        ${p.valorReferencia != null ? `<div class="offer-plan-card__reference">${SB_UI.formatCurrency(p.valorReferencia)}</div>` : ''}
-        <div class="offer-plan-card__price">${SB_UI.formatCurrency(p.valor)}${p.tipoCobranca === 'recurring_monthly' ? '<span>/mês</span>' : ''}</div>
+        <div class="offer-plan-card__price-block">
+          ${p.valorReferencia != null ? `<div class="offer-plan-card__reference">${SB_UI.formatCurrency(p.valorReferencia)}</div>` : ''}
+          <div class="offer-plan-card__price">${SB_UI.formatCurrency(p.valor)}${p.tipoCobranca === 'recurring_monthly' ? '<span>/mês</span>' : ''}</div>
+        </div>
         ${hasRows ? `
           <div class="offer-plan-card__rows">
-            ${equivalente != null ? `<div class="offer-plan-card__row">${SB_ICON.trendUp}<span>equivale a <strong>${SB_UI.formatCurrency(equivalente)}/mês</strong></span></div>` : ''}
-            ${economia != null && economia > 0 ? `<div class="offer-plan-card__row">${SB_ICON.wallet}<span>Economize <strong>${SB_UI.formatCurrency(economia)}</strong></span></div>` : ''}
+            ${equivalente != null ? `<div class="offer-plan-card__row"><span class="offer-plan-card__row-icon">${SB_ICON.trendUp}</span><span>equivale a <strong>${SB_UI.formatCurrency(equivalente)}/mês</strong></span></div>` : ''}
+            ${economia != null && economia > 0 ? `<div class="offer-plan-card__row"><span class="offer-plan-card__row-icon">${SB_ICON.wallet}</span><span>Economize <strong>${SB_UI.formatCurrency(economia)}</strong></span></div>` : ''}
+            ${p.descricaoCurta ? `<div class="offer-plan-card__row"><span class="offer-plan-card__row-icon">${SB_ICON.checkCircle}</span><span>${SB_UI.escapeHtml(p.descricaoCurta)}</span></div>` : ''}
+          </div>` : p.descricaoCurta ? `
+          <div class="offer-plan-card__desc-solo">
+            <span class="offer-plan-card__row-icon">${SB_ICON.checkCircle}</span>
+            <span>${SB_UI.escapeHtml(p.descricaoCurta)}</span>
           </div>` : ''}
-        ${p.descricaoCurta ? `<div class="offer-plan-card__desc">${SB_UI.escapeHtml(p.descricaoCurta)}</div>` : ''}
         <div class="offer-plan-card__cta">
           <button type="button" class="offer-plan-card__btn offer-plan-card__btn--${tone}" data-choose="${p.id}">
             Escolher ${SB_UI.escapeHtml(p.nome).toLowerCase()}
@@ -158,8 +166,8 @@
   }
 
   const tituloHtml = oferta.titulo
-    ? SB_UI.escapeHtml(oferta.titulo)
-    : `Escolha o <span class="offer-header__title-accent">plano ideal</span> para você`;
+    ? `<span class="offer-header__title-line1">${SB_UI.escapeHtml(oferta.titulo)}</span>`
+    : `<span class="offer-header__title-line1">Escolha o</span><span class="offer-header__title-line2">plano ideal</span>`;
   const tagline = oferta.mensagem || 'Escolha a opção que melhor combina com você. Quanto maior o período, maior a economia.';
   const gridCount = Math.min(Math.max(oferta.planos.length, 1), 4);
 
