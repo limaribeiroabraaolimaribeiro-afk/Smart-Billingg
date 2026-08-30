@@ -10,16 +10,20 @@
      Sem ?v=, uma correção publicada pode ficar até 10min invisível pra
      quem já tinha a página em cache (navegador ou CDN). Sempre que
      assets/js/oferta.js ou qualquer assets/css/*.css usado aqui mudar,
-     troque o valor de ?v= abaixo (ex.: pelo hash curto do commit) em TODAS
-     as tags — senão a correção não chega até o cache expirar sozinho. -->
+     troque o valor de ?v= abaixo em TODAS as tags — senão a correção não
+     chega até o cache expirar sozinho. Usa data (AAAAMMDD + letra de
+     sequência do dia) em vez do hash do commit de propósito: um commit não
+     consegue conter o próprio hash final, então perseguir isso a cada
+     amend/rebase é inútil — só precisa ser um valor que muda sempre que
+     estes arquivos mudam. -->
 <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="assets/css/variables.css?v=__BUILD__" />
-<link rel="stylesheet" href="assets/css/base.css?v=__BUILD__" />
-<link rel="stylesheet" href="assets/css/components.css?v=__BUILD__" />
-<link rel="stylesheet" href="assets/css/pages.css?v=__BUILD__" />
+<link rel="stylesheet" href="assets/css/variables.css?v=20260830a" />
+<link rel="stylesheet" href="assets/css/base.css?v=20260830a" />
+<link rel="stylesheet" href="assets/css/components.css?v=20260830a" />
+<link rel="stylesheet" href="assets/css/pages.css?v=20260830a" />
 </head>
 <body>
 
@@ -38,12 +42,12 @@
   </div>
 </div>
 
-<script src="assets/js/icons.js?v=__BUILD__"></script>
-<script src="assets/js/config.js?v=__BUILD__"></script>
+<script src="assets/js/icons.js?v=20260830a"></script>
+<script src="assets/js/config.js?v=20260830a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="assets/js/supabase-client.js?v=__BUILD__"></script>
-<script src="assets/js/data.js?v=__BUILD__"></script>
-<script src="assets/js/ui.js?v=__BUILD__"></script>
-<script src="assets/js/oferta.js?v=__BUILD__"></script>
+<script src="assets/js/supabase-client.js?v=20260830a"></script>
+<script src="assets/js/data.js?v=20260830a"></script>
+<script src="assets/js/ui.js?v=20260830a"></script>
+<script src="assets/js/oferta.js?v=20260830a"></script>
 </body>
 </html>
