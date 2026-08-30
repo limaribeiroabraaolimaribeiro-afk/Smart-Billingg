@@ -31,6 +31,7 @@ const SB_UI = (() => {
       pendente: { label: 'Pendente', cls: 'badge-pending' },
       atrasado: { label: 'Atrasado', cls: 'badge-overdue' },
       cancelado: { label: 'Cancelado', cls: 'badge-canceled' },
+      revisao: { label: 'Requer revisão', cls: 'badge-review' },
     };
     return map[status] || { label: status, cls: 'badge-canceled' };
   }

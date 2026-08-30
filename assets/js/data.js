@@ -846,6 +846,14 @@ const DB = (() => {
     function statusFromDb(row) {
       if (row.status === 'paid') return 'pago';
       if (row.status === 'cancelled') return 'cancelado';
+      // Pagamento InfinitePay confirmado mas com valor/estado divergente do
+      // esperado (ex.: cliente pagou por um checkout antigo, de antes do
+      // vencimento) — nunca perdido, registrado em payment_reviews (embedado
+      // via CHARGE_SELECT). Precisa de status próprio pro painel: nunca deve
+      // parecer "em dia"/"atrasada" como se nada tivesse acontecido.
+      const hasPendingReview = Array.isArray(row.payment_reviews)
+        && row.payment_reviews.some((r) => r.status === 'pending_review');
+      if (hasPendingReview) return 'revisao';
       return computeEffectiveStatus('pendente', `${row.due_date}T12:00:00`);
     }
 
@@ -908,7 +916,10 @@ const DB = (() => {
       };
     }
 
-    const CHARGE_SELECT = '*, client:clients(id, name, whatsapp, email, document, notes, status, created_at, updated_at)';
+    // payment_reviews(status) é embedado só pra detectar cobrança com pagamento
+    // divergente pendente de revisão (ver statusFromDb) — nunca expõe valores
+    // monetários nem transaction_nsu pra esta listagem geral.
+    const CHARGE_SELECT = '*, client:clients(id, name, whatsapp, email, document, notes, status, created_at, updated_at), payment_reviews(status)';
     const PAYMENT_SELECT = '*, charge:charges(charge_number, client:clients(id, name, whatsapp, email))';
     const RECEIPT_SELECT = '*, company:companies(name), charge:charges(charge_number, description, client:clients(id, name, whatsapp, email)), payment:payments(gross_amount, payment_method, installments, paid_at, provider_transaction_id)';
 
@@ -1009,7 +1020,11 @@ const DB = (() => {
           descricao: row.description,
           valor: Number(row.amount),
           vencimento: `${row.due_date}T12:00:00`,
-          status: row.status === 'paid' ? 'pago' : row.status === 'cancelled' ? 'cancelado' : computeEffectiveStatus('pendente', `${row.due_date}T12:00:00`),
+          // has_pending_review (não charges.status) sinaliza a revisão: um
+          // pagamento InfinitePay confirmado que não bateu com o valor/estado
+          // esperado (ex.: checkout antigo pago após o vencimento) fica em
+          // payment_reviews sem mexer no status da cobrança.
+          status: row.status === 'paid' ? 'pago' : row.status === 'cancelled' ? 'cancelado' : row.has_pending_review ? 'revisao' : computeEffectiveStatus('pendente', `${row.due_date}T12:00:00`),
           checkoutUrl: row.checkout_url,
           pagoEm: row.paid_at,
           cliente: { nome: row.client_name },

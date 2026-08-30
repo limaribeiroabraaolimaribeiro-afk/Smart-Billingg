@@ -51,6 +51,19 @@
     document.getElementById('btn-retry')?.addEventListener('click', () => runCheck({ manual: true }));
   }
 
+  // Pagamento confirmado pela InfinitePay, mas com valor diferente do
+  // esperado pela cobrança (ex.: checkout antigo pago depois do vencimento).
+  // Nunca fica preso em "processando" pra sempre: o dinheiro não foi
+  // perdido, só está com a equipe pra conciliação manual.
+  function reviewState(message) {
+    renderState(`
+      <div class="state-block">
+        <div class="state-block__icon" style="background:var(--blue-100);color:var(--blue-700);">${SB_ICON.clock}</div>
+        <div class="state-block__title">Pagamento em análise</div>
+        <p class="state-block__desc">${message}</p>
+      </div>`);
+  }
+
   function approvedState(info) {
     const formaLabel = info.payment_method === 'pix'
       ? 'Pix'
@@ -106,6 +119,12 @@
     if (result && result.success && result.paid) {
       document.title = 'Pagamento aprovado · Smart Billing';
       approvedState(result);
+      return;
+    }
+
+    if (result && result.review) {
+      document.title = 'Pagamento em análise · Smart Billing';
+      reviewState(result.message || 'Recebemos seu pagamento, mas ele precisa de conferência manual. Nossa equipe vai entrar em contato.');
       return;
     }
 

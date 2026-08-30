@@ -148,6 +148,24 @@
     return;
   }
 
+  // ---- Pagamento recebido, mas em análise (ex.: pago por um checkout antigo,
+  // com valor diferente do atualizado) — nunca oferece pagar de novo aqui:
+  // o dinheiro já foi recebido e está com a equipe pra conciliação manual.
+  if (cobranca.status === 'revisao') {
+    region.innerHTML = shell(`
+      ${heroBlock()}
+      <div class="public-card__body">
+        ${infoPanel()}
+        <div class="state-block" style="padding-top:24px;">
+          <div class="state-block__icon" style="background:var(--blue-100);color:var(--blue-700);">${SB_ICON.clock}</div>
+          <div class="state-block__title">Pagamento em análise</div>
+          <p class="state-block__desc">Recebemos a confirmação do seu pagamento, mas o valor não corresponde ao valor atual desta cobrança. Isso não significa que o pagamento foi perdido — nossa equipe já foi notificada e vai entrar em contato para regularizar a diferença.</p>
+        </div>
+      </div>`);
+    appendFooter();
+    return;
+  }
+
   // ---- Aviso discreto ANTES do vencimento (transparência exigida por lei:
   // a condição de atraso precisa ser informada antes de incidir) ----
   const avisoPreVencimento = cobranca.status !== 'atrasado' && cobranca.multaAtiva !== false ? `

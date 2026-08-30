@@ -22,7 +22,6 @@ import {
   handleOptions,
   jsonResponse,
   logEvent,
-  reaisToCents,
   mapCaptureMethod,
   callPaymentCheck,
   isValidWebhookPayload,
@@ -108,7 +107,7 @@ Deno.serve(async (req: Request) => {
   // ---- 2. Localizar a cobrança pelo order_nsu ----
   const { data: charge } = await adminClient
     .from('charges')
-    .select('id, company_id, amount, updated_amount, status, provider, charge_number')
+    .select('id, company_id, amount, status, provider, charge_number')
     .eq('charge_number', payload.order_nsu)
     .maybeSingle();
 
@@ -145,32 +144,22 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ success: false, message: 'Pagamento não confirmado.' }, 400);
   }
 
-  // ---- 4. Comparar valor confirmado com o valor esperado da cobrança ----
-  // updated_amount (quando existir) é o valor com multa/juros travado na
-  // última vez que um checkout foi gerado pra esta cobrança vencida — nunca
-  // amount puro nesse caso, senão o pagamento com encargos seria rejeitado.
-  const confirmedAmountCents = check.amount ?? payload.amount;
-  let expectedCents: number;
-  try {
-    expectedCents = reaisToCents(Number(charge.updated_amount ?? charge.amount));
-  } catch {
-    await markError('Valor da cobrança inválido no banco.');
-    return jsonResponse({ success: false, message: 'Cobrança com valor inválido.' }, 400);
-  }
-
-  if (confirmedAmountCents !== expectedCents) {
-    await markError(`Valor divergente: confirmado ${confirmedAmountCents}, esperado ${expectedCents}.`);
-    logEvent(FN_NAME, { order_nsu: payload.order_nsu, error: 'amount_mismatch' });
-    return jsonResponse({ success: false, message: 'Valor divergente.' }, 400);
-  }
-
   const paymentMethod = mapCaptureMethod(payload.capture_method);
   if (!paymentMethod) {
     await markError('capture_method desconhecido.');
     return jsonResponse({ success: false, message: 'Forma de pagamento não reconhecida.' }, 400);
   }
 
-  // ---- 5. Registrar o pagamento de forma atômica ----
+  // ---- 4. Registrar o pagamento de forma atômica ----
+  // A comparação entre o valor confirmado e o valor esperado (amount ou
+  // updated_amount travado) acontece inteiramente dentro de
+  // register_infinitepay_payment — nunca aqui. A InfinitePay não oferece
+  // forma de cancelar/invalidar um checkout antigo, então um link gerado
+  // antes do vencimento continua pagável mesmo depois de a cobrança ganhar
+  // multa/juros; se isso acontecer, a função grava o pagamento em
+  // payment_reviews em vez de rejeitar — o dinheiro já é real, confirmado
+  // pelo payment_check acima, e nunca pode ser descartado.
+  const confirmedAmountCents = check.amount ?? payload.amount;
   const { data: registerResult, error: registerErr } = await adminClient.rpc('register_infinitepay_payment', {
     p_charge_id: charge.id,
     p_transaction_nsu: payload.transaction_nsu,
@@ -188,12 +177,24 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ success: false, message: 'Não foi possível registrar o pagamento.' }, 400);
   }
 
+  // Marca o evento como processado em QUALQUER desfecho não-erro (liquidado
+  // ou sinalizado para revisão) — o pagamento já está durável no banco de um
+  // jeito ou de outro, então a InfinitePay não precisa (nem deve) reentregar
+  // este webhook de novo. Só uma falha de fato (registerErr acima) continua
+  // devolvendo erro pra InfinitePay tentar de novo mais tarde.
   await adminClient
     .from('webhook_events')
     .update({ processed: true, processed_at: new Date().toISOString(), error_message: null })
     .eq('id', eventId);
 
   const row = Array.isArray(registerResult) ? registerResult[0] : registerResult;
+  const outcome = row?.outcome as string | undefined;
+
+  if (outcome === 'flagged_for_review' || outcome === 'already_flagged') {
+    logEvent(FN_NAME, { order_nsu: payload.order_nsu, status: 'flagged_for_review', review_id: row?.review_id });
+    return jsonResponse({ success: true, message: 'Pagamento confirmado, mas o valor/estado não confere com a cobrança — registrado para revisão manual.' }, 200);
+  }
+
   logEvent(FN_NAME, { order_nsu: payload.order_nsu, status: 'processed', already_processed: Boolean(row?.already_processed) });
   return jsonResponse({ success: true, message: 'Pagamento processado.' }, 200);
 });

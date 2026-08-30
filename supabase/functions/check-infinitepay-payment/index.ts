@@ -20,7 +20,6 @@ import {
   handleOptions,
   jsonResponse,
   logEvent,
-  reaisToCents,
   mapCaptureMethod,
   callPaymentCheck,
   isValidCheckPaymentPayload,
@@ -30,6 +29,8 @@ import {
 
 const FN_NAME = 'check-infinitepay-payment';
 const GENERIC_NOT_CONFIRMED = { success: true, paid: false } as const;
+const REVIEW_MESSAGE = 'Recebemos a confirmação do seu pagamento, mas o valor não corresponde ao valor atual desta cobrança (é comum acontecer quando um link de pagamento antigo é usado depois do vencimento). Seu pagamento NÃO foi perdido: nossa equipe vai analisar e entrar em contato para regularizar a diferença.';
+const REVIEW_RESPONSE = { success: true, paid: false, review: true, message: REVIEW_MESSAGE } as const;
 
 Deno.serve(async (req: Request) => {
   const cors = handleOptions(req);
@@ -62,9 +63,13 @@ Deno.serve(async (req: Request) => {
 
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+  // payment_reviews(status) embedado só pra detectar, sem uma segunda
+  // consulta, se esta cobrança já tem uma divergência pendente registrada
+  // (ver nota sobre "requer revisão" em sql/late_fees_and_interest.sql —
+  // charges.status nunca ganha um valor novo pra isso).
   const { data: charge } = await adminClient
     .from('charges')
-    .select('id, company_id, amount, updated_amount, status, charge_number, max_installments')
+    .select('id, company_id, amount, status, charge_number, max_installments, payment_reviews(status)')
     .eq('public_token', payload.token)
     .maybeSingle();
 
@@ -88,6 +93,16 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(GENERIC_NOT_CONFIRMED, 200);
   }
 
+  // Já sinalizada para revisão manual numa visita anterior (ex.: pagamento
+  // recebido por um checkout antigo, com valor divergente) — não depende dos
+  // parâmetros da URL (podem não estar mais presentes num recarregamento) e
+  // não repete a consulta à InfinitePay: o resultado já é definitivo aqui.
+  const hasPendingReview = Array.isArray(charge.payment_reviews)
+    && charge.payment_reviews.some((r: { status: string }) => r.status === 'pending_review');
+  if (hasPendingReview) {
+    return jsonResponse(REVIEW_RESPONSE, 200);
+  }
+
   let check;
   try {
     check = await callPaymentCheck({
@@ -106,20 +121,20 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(GENERIC_NOT_CONFIRMED, 200);
   }
 
-  // updated_amount (quando existir) é o valor com multa/juros travado na
-  // última vez que um checkout foi gerado pra esta cobrança vencida.
-  let expectedCents: number;
-  try {
-    expectedCents = reaisToCents(Number(charge.updated_amount ?? charge.amount));
-  } catch {
+  // Ao contrário do payload do webhook (que a InfinitePay envia com amount),
+  // esta chamada não tem nenhum valor "declarado" pra usar de fallback — só o
+  // que payment_check devolveu. Sem ele, não há como saber quanto foi pago;
+  // melhor tratar como "ainda não confirmado" do que registrar um valor
+  // adivinhado. A comparação entre o valor confirmado e o esperado (amount ou
+  // updated_amount travado) acontece inteiramente dentro de
+  // register_infinitepay_payment — nunca aqui. Ver nota em infinitepay-webhook
+  // sobre por que um checkout antigo continua pagável e nunca pode ter seu
+  // pagamento simplesmente descartado quando o valor não confere.
+  if (check.amount == null) {
+    logEvent(FN_NAME, { charge_number: charge.charge_number, error: 'payment_check_missing_amount' });
     return jsonResponse(GENERIC_NOT_CONFIRMED, 200);
   }
-
-  const confirmedAmountCents = check.amount ?? expectedCents;
-  if (confirmedAmountCents !== expectedCents) {
-    logEvent(FN_NAME, { charge_number: charge.charge_number, error: 'amount_mismatch' });
-    return jsonResponse(GENERIC_NOT_CONFIRMED, 200);
-  }
+  const confirmedAmountCents = check.amount;
 
   // O endpoint payment_check não documenta capture_method na resposta nesta
   // integração; usamos o valor que a InfinitePay anexou na redirect_url (se
@@ -143,6 +158,13 @@ Deno.serve(async (req: Request) => {
   }
 
   const row = Array.isArray(registerResult) ? registerResult[0] : registerResult;
+  const outcome = row?.outcome as string | undefined;
+
+  if (outcome === 'flagged_for_review' || outcome === 'already_flagged') {
+    logEvent(FN_NAME, { charge_number: charge.charge_number, status: 'flagged_for_review', review_id: row?.review_id });
+    return jsonResponse(REVIEW_RESPONSE, 200);
+  }
+
   const paidInfo = await loadPaidPublicInfo(adminClient, charge.id, charge.charge_number, Number(charge.amount));
   logEvent(FN_NAME, { charge_number: charge.charge_number, status: 'confirmed', already_processed: Boolean(row?.already_processed) });
   return jsonResponse(paidInfo ?? GENERIC_NOT_CONFIRMED, 200);
