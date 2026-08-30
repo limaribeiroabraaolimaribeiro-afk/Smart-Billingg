@@ -339,7 +339,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 28px var(--space-4) 48px;
+  padding: 20px var(--space-4) 32px;
   background: #030309;
   color: #fff;
 
@@ -383,7 +383,7 @@
 
 /* ---------- Header (compacto de propósito — precisa sobrar espaço pros
    3 cards + CTAs caberem sem rolar em 1440x900/1920x1080) ---------- */
-.offer-header { text-align: center; margin-bottom: 22px; }
+.offer-header { text-align: center; margin-bottom: 16px; }
 
 /* Marca em HTML/CSS (ícone SVG + texto), não a logo.png com mix-blend-mode
    usada em outras páginas públicas: dentro do stacking context isolado por
@@ -407,7 +407,7 @@
 .offer-header__title { margin-bottom: 10px; }
 .offer-header__title-line1 {
   display: block;
-  font-size: clamp(17px, 2.2vw, 23px);
+  font-size: clamp(18px, 2.4vw, 26px);
   font-weight: 800;
   color: #fff;
   letter-spacing: -0.005em;
@@ -415,7 +415,7 @@
 }
 .offer-header__title-line2 {
   display: block;
-  font-size: clamp(48px, 6vw, 88px);
+  font-size: clamp(60px, 7.6vw, 118px);
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 0.98;
@@ -430,7 +430,7 @@
   display: flex; align-items: center; justify-content: center; gap: 14px;
   font-size: 12px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
   color: var(--offer-text-dim);
-  margin-top: 10px;
+  margin-top: 6px;
 }
 .offer-header__subtitle::before,
 .offer-header__subtitle::after {
@@ -439,8 +439,8 @@
 }
 .offer-header__subtitle::after { background: linear-gradient(90deg, var(--offer-gold-deep), transparent); }
 .offer-header__message {
-  margin: 10px auto 0; max-width: 440px;
-  font-size: 13px; line-height: 1.45; color: var(--offer-text-dim);
+  margin: 8px auto 0; max-width: 440px;
+  font-size: 13px; line-height: 1.4; color: var(--offer-text-dim);
 }
 
 /* ---------- Fileira principal: Mensal | Anual (protagonista) | Semestral ----------
@@ -453,37 +453,38 @@
   flex-wrap: wrap;
   justify-content: center;
   align-items: flex-end;
-  gap: 20px;
+  gap: 16px;
   width: 100%;
 }
 
 .offer-plan-card {
   position: relative;
   display: flex; flex-direction: column; align-items: center; text-align: center;
-  gap: 8px;
+  gap: 6px;
   background: var(--offer-card-bg);
   border: 1px solid var(--offer-border);
-  border-radius: 26px;
-  padding: 32px 18px 18px;
+  border-radius: 24px;
+  padding: 26px 18px 16px;
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   opacity: 0; transform: translateY(20px);
   animation: offerCardIn 0.5s var(--ease-out) forwards;
-  flex: 0 1 290px;
-  max-width: 300px;
+  flex: 0 1 270px;
+  max-width: 280px;
   /* Moderado, não gigante: só o suficiente pra Mensal (menos conteúdo, sem
      painel de linhas) chegar perto da altura natural de Semestral, sem
      sobrar um vazio grande entre o conteúdo e o CTA. */
-  min-height: 400px;
+  min-height: 364px;
   order: 5;
 }
 .offer-plan-card[data-role="mensal"] { order: 1; animation-delay: 0.03s; }
 .offer-plan-card[data-role="anual"] {
   order: 2;
-  flex-basis: 330px;
-  max-width: 350px;
-  /* Único card com altura reforçada de propósito — precisa continuar
-     visivelmente maior/mais alto que Mensal/Semestral (protagonista). */
-  min-height: 450px;
+  flex-basis: 305px;
+  max-width: 320px;
+  /* Único card com altura reforçada de propósito — ~13% mais alto que
+     Mensal/Semestral, continua visivelmente maior/mais alto (protagonista),
+     sem repetir o exagero do min-height anterior. */
+  min-height: 412px;
   z-index: 2;
   animation-delay: 0.1s;
   border-color: rgba(243, 200, 105, 0.6);
@@ -533,14 +534,13 @@
 }
 
 .offer-plan-card__icon {
-  width: 46px; height: 46px; border-radius: 50%;
+  width: 40px; height: 40px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: rgba(255, 255, 255, 0.65);
-  margin-bottom: 2px;
 }
-.offer-plan-card__icon svg { width: 19px; height: 19px; }
+.offer-plan-card__icon svg { width: 17px; height: 17px; }
 .offer-plan-card[data-role="anual"] .offer-plan-card__icon { color: var(--offer-gold); border-color: rgba(243, 200, 105, 0.55); box-shadow: 0 0 20px rgba(243, 200, 105, 0.32); }
 .offer-plan-card[data-role="semestral"] .offer-plan-card__icon { color: var(--offer-purple); border-color: rgba(173, 139, 250, 0.55); box-shadow: 0 0 20px rgba(109, 40, 217, 0.32); }
 
@@ -579,8 +579,8 @@
 .offer-plan-card__price span { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.5); white-space: nowrap; }
 
 .offer-plan-card__rows {
-  width: 100%; display: flex; flex-direction: column; gap: 8px;
-  margin-top: 2px; padding: 12px 12px;
+  width: 100%; display: flex; flex-direction: column; gap: 6px;
+  margin-top: 2px; padding: 9px 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 14px;
@@ -667,7 +667,7 @@
 .offer-footer-note {
   position: relative; z-index: 1;
   display: flex; align-items: center; justify-content: center; gap: 7px;
-  margin-top: 28px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.45);
+  margin-top: 20px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.45);
 }
 .offer-footer-note svg { width: 15px; height: 15px; color: var(--offer-gold); }
 

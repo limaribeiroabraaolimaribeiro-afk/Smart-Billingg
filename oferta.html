@@ -5,14 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
 <title>Escolha seu plano · Smart Billing</title>
+<!-- Cache busting: GitHub Pages serve estes arquivos com Cache-Control:
+     max-age=600 (fixo, não configurável no projeto) e sem hash de build.
+     Sem ?v=, uma correção publicada pode ficar até 10min invisível pra
+     quem já tinha a página em cache (navegador ou CDN). Sempre que
+     assets/js/oferta.js ou qualquer assets/css/*.css usado aqui mudar,
+     troque o valor de ?v= abaixo (ex.: pelo hash curto do commit) em TODAS
+     as tags — senão a correção não chega até o cache expirar sozinho. -->
 <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="assets/css/variables.css" />
-<link rel="stylesheet" href="assets/css/base.css" />
-<link rel="stylesheet" href="assets/css/components.css" />
-<link rel="stylesheet" href="assets/css/pages.css" />
+<link rel="stylesheet" href="assets/css/variables.css?v=__BUILD__" />
+<link rel="stylesheet" href="assets/css/base.css?v=__BUILD__" />
+<link rel="stylesheet" href="assets/css/components.css?v=__BUILD__" />
+<link rel="stylesheet" href="assets/css/pages.css?v=__BUILD__" />
 </head>
 <body>
 
@@ -31,12 +38,12 @@
   </div>
 </div>
 
-<script src="assets/js/icons.js"></script>
-<script src="assets/js/config.js"></script>
+<script src="assets/js/icons.js?v=__BUILD__"></script>
+<script src="assets/js/config.js?v=__BUILD__"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="assets/js/supabase-client.js"></script>
-<script src="assets/js/data.js"></script>
-<script src="assets/js/ui.js"></script>
-<script src="assets/js/oferta.js"></script>
+<script src="assets/js/supabase-client.js?v=__BUILD__"></script>
+<script src="assets/js/data.js?v=__BUILD__"></script>
+<script src="assets/js/ui.js?v=__BUILD__"></script>
+<script src="assets/js/oferta.js?v=__BUILD__"></script>
 </body>
 </html>

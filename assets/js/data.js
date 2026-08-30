@@ -1408,7 +1408,7 @@ const DB = (() => {
         valor: Number(row.amount),
         valorReferencia: row.reference_amount != null ? Number(row.reference_amount) : null,
         descontoPercent: Number(row.discount_percent || 0),
-        duracaoMeses: row.duration_months,
+        duracaoMeses: row.duration_months != null ? Number(row.duration_months) : null,
         tipoCobranca: row.billing_type,
         badge: row.badge || '',
         destaque: !!row.featured,
@@ -1519,7 +1519,13 @@ const DB = (() => {
         planos: (row.plans || []).map((p) => ({
           id: p.id, nome: p.name, descricao: p.description, descricaoCurta: p.short_description,
           valor: Number(p.amount), valorReferencia: p.reference_amount != null ? Number(p.reference_amount) : null,
-          descontoPercent: Number(p.discount_percent || 0), duracaoMeses: p.duration_months, tipoCobranca: p.billing_type,
+          descontoPercent: Number(p.discount_percent || 0),
+          // Number(...) por segurança: classificarPlanos() em oferta.js compara
+          // com === 6/12, então mesmo vindo como string algum dia (mudança na
+          // API, serialização diferente etc.) o plano não deve silenciosamente
+          // cair em "secundário" por divergência de tipo.
+          duracaoMeses: p.duration_months != null ? Number(p.duration_months) : null,
+          tipoCobranca: p.billing_type,
           badge: p.badge || '', destaque: !!p.featured,
         })),
       };
