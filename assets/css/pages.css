@@ -326,10 +326,10 @@
 
 /* ==========================================================================
    Página pública da oferta de planos (oferta.html) — reconstruída como
-   vitrine de marketing de posição fixa (Mensal | Anual protagonista | 2
-   anos), não um grid genérico de N cards. Independente do .plan-card do
-   painel administrativo (planos.js): nenhuma classe abaixo é compartilhada
-   com outras páginas.
+   vitrine de marketing de posição fixa (Mensal | Anual protagonista |
+   Semestral), não um grid genérico de N cards. Independente do .plan-card
+   do painel administrativo (planos.js): nenhuma classe abaixo é
+   compartilhada com outras páginas.
    ========================================================================== */
 .offer-page {
   position: relative;
@@ -443,7 +443,7 @@
   font-size: 13px; line-height: 1.45; color: var(--offer-text-dim);
 }
 
-/* ---------- Fileira principal: Mensal | Anual (protagonista) | 2 anos ----------
+/* ---------- Fileira principal: Mensal | Anual (protagonista) | Semestral ----------
    Um único flex container cuida dos 2 layouts (desktop 3-lado-a-lado /
    mobile empilhado) só trocando `order`+`flex-basis` por media query — não
    precisa de DOM diferente nem de duplicar markup. */
@@ -470,7 +470,10 @@
   animation: offerCardIn 0.5s var(--ease-out) forwards;
   flex: 0 1 290px;
   max-width: 300px;
-  min-height: 500px;
+  /* Moderado, não gigante: só o suficiente pra Mensal (menos conteúdo, sem
+     painel de linhas) chegar perto da altura natural de Semestral, sem
+     sobrar um vazio grande entre o conteúdo e o CTA. */
+  min-height: 400px;
   order: 5;
 }
 .offer-plan-card[data-role="mensal"] { order: 1; animation-delay: 0.03s; }
@@ -478,13 +481,15 @@
   order: 2;
   flex-basis: 330px;
   max-width: 350px;
-  min-height: 555px;
+  /* Único card com altura reforçada de propósito — precisa continuar
+     visivelmente maior/mais alto que Mensal/Semestral (protagonista). */
+  min-height: 450px;
   z-index: 2;
   animation-delay: 0.1s;
   border-color: rgba(243, 200, 105, 0.6);
   box-shadow: 0 0 0 1px rgba(243, 200, 105, 0.4), 0 10px 24px rgba(243, 200, 105, 0.2), 0 34px 76px rgba(0, 0, 0, 0.6), 0 0 60px rgba(243, 200, 105, 0.18);
 }
-.offer-plan-card[data-role="doisAnos"] {
+.offer-plan-card[data-role="semestral"] {
   order: 3;
   animation-delay: 0.17s;
   border-color: rgba(173, 139, 250, 0.5);
@@ -537,7 +542,7 @@
 }
 .offer-plan-card__icon svg { width: 19px; height: 19px; }
 .offer-plan-card[data-role="anual"] .offer-plan-card__icon { color: var(--offer-gold); border-color: rgba(243, 200, 105, 0.55); box-shadow: 0 0 20px rgba(243, 200, 105, 0.32); }
-.offer-plan-card[data-role="doisAnos"] .offer-plan-card__icon { color: var(--offer-purple); border-color: rgba(173, 139, 250, 0.55); box-shadow: 0 0 20px rgba(109, 40, 217, 0.32); }
+.offer-plan-card[data-role="semestral"] .offer-plan-card__icon { color: var(--offer-purple); border-color: rgba(173, 139, 250, 0.55); box-shadow: 0 0 20px rgba(109, 40, 217, 0.32); }
 
 .offer-plan-card__name { font-size: 13.5px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(255, 255, 255, 0.65); }
 .offer-plan-card__name::after {
@@ -545,14 +550,14 @@
   background: rgba(255, 255, 255, 0.2); border-radius: 2px;
 }
 .offer-plan-card[data-role="anual"] .offer-plan-card__name::after { background: var(--offer-gold); }
-.offer-plan-card[data-role="doisAnos"] .offer-plan-card__name::after { background: var(--offer-purple); }
+.offer-plan-card[data-role="semestral"] .offer-plan-card__name::after { background: var(--offer-purple); }
 
 .offer-plan-card__discount {
   font-size: 11.5px; font-weight: 800; padding: 4px 14px; border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.8);
 }
 .offer-plan-card[data-role="anual"] .offer-plan-card__discount { background: rgba(243, 200, 105, 0.16); color: var(--offer-gold); }
-.offer-plan-card[data-role="doisAnos"] .offer-plan-card__discount { background: rgba(173, 139, 250, 0.18); color: var(--offer-purple); }
+.offer-plan-card[data-role="semestral"] .offer-plan-card__discount { background: rgba(173, 139, 250, 0.18); color: var(--offer-purple); }
 
 .offer-plan-card__price-block { margin-top: 1px; }
 .offer-plan-card__reference { font-size: 12.5px; color: rgba(255, 255, 255, 0.4); text-decoration: line-through; }
@@ -588,7 +593,7 @@
 }
 .offer-plan-card__row-icon svg { width: 11px; height: 11px; }
 .offer-plan-card[data-role="anual"] .offer-plan-card__row-icon { background: rgba(243, 200, 105, 0.16); color: var(--offer-gold); }
-.offer-plan-card[data-role="doisAnos"] .offer-plan-card__row-icon { background: rgba(173, 139, 250, 0.18); color: var(--offer-purple); }
+.offer-plan-card[data-role="semestral"] .offer-plan-card__row-icon { background: rgba(173, 139, 250, 0.18); color: var(--offer-purple); }
 .offer-plan-card__row strong { color: #fff; font-weight: 700; }
 
 /* Mensal sem linhas de equivalente/economia — descrição simples e
@@ -621,9 +626,10 @@
 }
 .offer-plan-card__btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
-/* ---------- Semestral (e qualquer outra duração) — oferta secundária,
-   faixa horizontal discreta no desktop, nunca competindo com o Anual.
-   Um único indicador de desconto (sem repetir badge + pill). ---------- */
+/* ---------- Qualquer duração sem posição fixa (ex.: um plano de 24 meses)
+   — oferta secundária, faixa horizontal discreta no desktop, nunca
+   competindo com o Anual. Um único indicador de desconto (sem repetir
+   badge + pill). Mensal/Anual/Semestral NUNCA caem aqui. ---------- */
 .offer-secondary {
   position: relative; z-index: 1;
   flex-basis: 100%;
@@ -684,7 +690,8 @@
 /* ---------- Responsivo ----------
    Abaixo de ~900px não há espaço confortável pros 3 totens lado a lado —
    empilha em coluna única, com o Anual (a opção comercial que queremos
-   vender) sempre primeiro, depois Mensal, Semestral e 2 anos. */
+   vender) sempre primeiro, depois Mensal, Semestral e qualquer outra
+   duração secundária por último. */
 @media (max-width: 900px) {
   .offer-hero-row { flex-direction: column; align-items: stretch; gap: 16px; }
   .offer-plan-card,
@@ -694,8 +701,8 @@
   }
   .offer-plan-card[data-role="anual"] { order: 1; max-width: 480px; }
   .offer-plan-card[data-role="mensal"] { order: 2; }
-  .offer-secondary { order: 3; }
-  .offer-plan-card[data-role="doisAnos"] { order: 4; }
+  .offer-plan-card[data-role="semestral"] { order: 3; }
+  .offer-secondary { order: 4; }
 
   .offer-secondary {
     flex-direction: column; align-items: stretch; text-align: center;

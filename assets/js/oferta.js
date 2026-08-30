@@ -126,13 +126,16 @@
   // ------------------------------------------------------------------------
   // Papel comercial de cada plano — nunca pelo nome, só por billing_type/
   // duration_months/destaque. A composição visual (Mensal esquerda, Anual
-  // centro/dourado, 2 anos direita, qualquer outra duração como oferta
+  // centro/dourado, Semestral direita, qualquer outra duração como oferta
   // secundária abaixo) é uma decisão de marketing fixa, independente de
-  // quantos planos existirem ou da ordem em que vieram do banco.
+  // quantos planos existirem ou da ordem em que vieram do banco. A página
+  // se adapta aos planos que realmente existem — nenhuma duração além de
+  // mensal/anual/semestral tem posição obrigatória (inclusive 24 meses, que
+  // agora cai em "secundário" como qualquer outra duração não mapeada).
   //   recurring_monthly           -> mensal (esquerda)
   //   destaque=true, senão dur=12 -> anual (centro, protagonista)
-  //   duration_months=24          -> 2 anos (direita)
-  //   qualquer outro              -> secundário (faixa abaixo, ex.: semestral)
+  //   duration_months=6           -> semestral (direita)
+  //   qualquer outro              -> secundário (faixa abaixo)
   // ------------------------------------------------------------------------
   function classificarPlanos(planos) {
     const usados = new Set();
@@ -141,10 +144,10 @@
     let anual = planos.find((p) => p.destaque && !usados.has(p.id));
     if (!anual) anual = planos.find((p) => p.duracaoMeses === 12 && !usados.has(p.id));
     if (anual) usados.add(anual.id);
-    const doisAnos = planos.find((p) => p.duracaoMeses === 24 && !usados.has(p.id));
-    if (doisAnos) usados.add(doisAnos.id);
+    const semestral = planos.find((p) => p.duracaoMeses === 6 && !usados.has(p.id));
+    if (semestral) usados.add(semestral.id);
     const secundarios = planos.filter((p) => !usados.has(p.id));
-    return { mensal, anual, doisAnos, secundarios };
+    return { mensal, anual, semestral, secundarios };
   }
 
   // Preço muito grande (clamp) mas que precisa caber no card sempre — o
@@ -170,10 +173,10 @@
   }
 
   // Cards principais: Mensal (neutro) / Anual (dourado, protagonista) /
-  // 2 anos (roxo) — a cor é fixa por papel, não depende de badge/destaque
+  // Semestral (roxo) — a cor é fixa por papel, não depende de badge/destaque
   // (só o Anual usa destaque para decidir QUEM ocupa o centro).
   function heroCardHtml(p, role) {
-    const tone = role === 'anual' ? 'featured' : role === 'doisAnos' ? 'accent' : 'default';
+    const tone = role === 'anual' ? 'featured' : role === 'semestral' ? 'accent' : 'default';
     const precoFormatado = SB_UI.formatCurrency(p.valor);
     const badgeIcon = role === 'anual' ? SB_ICON.star : SB_ICON.diamond;
     return `
@@ -225,9 +228,9 @@
       </div>`;
   }
 
-  const { mensal, anual, doisAnos, secundarios } = classificarPlanos(oferta.planos);
+  const { mensal, anual, semestral, secundarios } = classificarPlanos(oferta.planos);
 
-  if (!mensal && !anual && !doisAnos && secundarios.length === 0) {
+  if (!mensal && !anual && !semestral && secundarios.length === 0) {
     errorState('Nenhum plano disponível', 'Esta oferta não tem planos ativos no momento. Entre em contato para receber um novo link.');
     return;
   }
@@ -248,7 +251,7 @@
     <div class="offer-hero-row">
       ${mensal ? heroCardHtml(mensal, 'mensal') : ''}
       ${anual ? heroCardHtml(anual, 'anual') : ''}
-      ${doisAnos ? heroCardHtml(doisAnos, 'doisAnos') : ''}
+      ${semestral ? heroCardHtml(semestral, 'semestral') : ''}
       ${secundarios.map(secondaryBannerHtml).join('')}
     </div>
     <div class="offer-footer-note">${SB_ICON.shield}<span>Formas de pagamento disponíveis no checkout.</span></div>
