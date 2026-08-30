@@ -118,36 +118,76 @@
     return p.valor / p.duracaoMeses;
   }
 
-  // Hierarquia visual dinâmica (não depende do texto do badge, só de campos
-  // já existentes): plano com destaque=true vira o card de ouro/featured;
-  // qualquer outro plano com badge preenchido vira o card roxo/accent; sem
-  // badge, card neutro — mesma lógica pra 1, 2, 3 ou 4 planos.
-  function planCardHtml(p) {
+  if (!oferta.planos || oferta.planos.length === 0) {
+    errorState('Nenhum plano disponível', 'Esta oferta não tem planos ativos no momento. Entre em contato para receber um novo link.');
+    return;
+  }
+
+  // ------------------------------------------------------------------------
+  // Papel comercial de cada plano — nunca pelo nome, só por billing_type/
+  // duration_months/destaque. A composição visual (Mensal esquerda, Anual
+  // centro/dourado, 2 anos direita, qualquer outra duração como oferta
+  // secundária abaixo) é uma decisão de marketing fixa, independente de
+  // quantos planos existirem ou da ordem em que vieram do banco.
+  //   recurring_monthly           -> mensal (esquerda)
+  //   destaque=true, senão dur=12 -> anual (centro, protagonista)
+  //   duration_months=24          -> 2 anos (direita)
+  //   qualquer outro              -> secundário (faixa abaixo, ex.: semestral)
+  // ------------------------------------------------------------------------
+  function classificarPlanos(planos) {
+    const usados = new Set();
+    const mensal = planos.find((p) => p.tipoCobranca === 'recurring_monthly' && !usados.has(p.id));
+    if (mensal) usados.add(mensal.id);
+    let anual = planos.find((p) => p.destaque && !usados.has(p.id));
+    if (!anual) anual = planos.find((p) => p.duracaoMeses === 12 && !usados.has(p.id));
+    if (anual) usados.add(anual.id);
+    const doisAnos = planos.find((p) => p.duracaoMeses === 24 && !usados.has(p.id));
+    if (doisAnos) usados.add(doisAnos.id);
+    const secundarios = planos.filter((p) => !usados.has(p.id));
+    return { mensal, anual, doisAnos, secundarios };
+  }
+
+  // Preço muito grande (clamp) mas que precisa caber no card sempre — o
+  // tamanho recua conforme o texto formatado fica mais comprido (R$ 190 vs
+  // R$ 12.345,00), calculado a partir do valor real, nunca de uma lista
+  // fixa de planos.
+  function priceSizeClass(formatted) {
+    const len = formatted.replace(/\s/g, '').length;
+    if (len <= 9) return 'is-price-lg';
+    if (len <= 11) return 'is-price-md';
+    return 'is-price-sm';
+  }
+
+  function rowsHtml(p) {
     const equivalente = moneyPerMonth(p);
     const economia = p.valorReferencia != null ? p.valorReferencia - p.valor : null;
-    const isFeatured = !!p.destaque;
-    const isAccent = !isFeatured && Boolean(p.badge);
-    const tone = isFeatured ? 'featured' : isAccent ? 'accent' : 'default';
-    const hasRows = equivalente != null || (economia != null && economia > 0);
+    const linhas = [
+      equivalente != null ? `<div class="offer-plan-card__row"><span class="offer-plan-card__row-icon">${SB_ICON.trendUp}</span><span>equivale a <strong>${SB_UI.formatCurrency(equivalente)}/mês</strong></span></div>` : '',
+      economia != null && economia > 0 ? `<div class="offer-plan-card__row"><span class="offer-plan-card__row-icon">${SB_ICON.wallet}</span><span>Economize <strong>${SB_UI.formatCurrency(economia)}</strong></span></div>` : '',
+    ].filter(Boolean);
+    if (!linhas.length) return '';
+    return `<div class="offer-plan-card__rows">${linhas.join('')}</div>`;
+  }
 
-    const badgeIcon = isFeatured ? SB_ICON.star : SB_ICON.diamond;
-
+  // Cards principais: Mensal (neutro) / Anual (dourado, protagonista) /
+  // 2 anos (roxo) — a cor é fixa por papel, não depende de badge/destaque
+  // (só o Anual usa destaque para decidir QUEM ocupa o centro).
+  function heroCardHtml(p, role) {
+    const tone = role === 'anual' ? 'featured' : role === 'doisAnos' ? 'accent' : 'default';
+    const precoFormatado = SB_UI.formatCurrency(p.valor);
+    const badgeIcon = role === 'anual' ? SB_ICON.star : SB_ICON.diamond;
     return `
-      <div class="offer-plan-card ${isFeatured ? 'offer-plan-card--featured' : isAccent ? 'offer-plan-card--accent' : ''}" data-plan-id="${p.id}">
-        ${p.badge ? `<span class="offer-plan-card__badge offer-plan-card__badge--${isFeatured ? 'gold' : 'purple'}">${badgeIcon}${SB_UI.escapeHtml(p.badge)}</span>` : ''}
+      <div class="offer-plan-card offer-plan-card--${tone}" data-role="${role}" data-plan-id="${p.id}">
+        ${p.badge ? `<span class="offer-plan-card__badge offer-plan-card__badge--${role === 'anual' ? 'gold' : 'purple'}">${badgeIcon}${SB_UI.escapeHtml(p.badge)}</span>` : ''}
         <div class="offer-plan-card__icon">${SB_ICON.calendar}</div>
         <div class="offer-plan-card__name">${SB_UI.escapeHtml(p.nome)}</div>
         ${p.descontoPercent > 0 ? `<div class="offer-plan-card__discount">${p.descontoPercent}% OFF</div>` : ''}
         <div class="offer-plan-card__price-block">
           ${p.valorReferencia != null ? `<div class="offer-plan-card__reference">${SB_UI.formatCurrency(p.valorReferencia)}</div>` : ''}
-          <div class="offer-plan-card__price">${SB_UI.formatCurrency(p.valor)}${p.tipoCobranca === 'recurring_monthly' ? '<span>/mês</span>' : ''}</div>
+          <div class="offer-plan-card__price ${priceSizeClass(precoFormatado)}">${precoFormatado}${p.tipoCobranca === 'recurring_monthly' ? '<span>/mês</span>' : ''}</div>
         </div>
-        ${hasRows ? `
-          <div class="offer-plan-card__rows">
-            ${equivalente != null ? `<div class="offer-plan-card__row"><span class="offer-plan-card__row-icon">${SB_ICON.trendUp}</span><span>equivale a <strong>${SB_UI.formatCurrency(equivalente)}/mês</strong></span></div>` : ''}
-            ${economia != null && economia > 0 ? `<div class="offer-plan-card__row"><span class="offer-plan-card__row-icon">${SB_ICON.wallet}</span><span>Economize <strong>${SB_UI.formatCurrency(economia)}</strong></span></div>` : ''}
-            ${p.descricaoCurta ? `<div class="offer-plan-card__row"><span class="offer-plan-card__row-icon">${SB_ICON.checkCircle}</span><span>${SB_UI.escapeHtml(p.descricaoCurta)}</span></div>` : ''}
-          </div>` : p.descricaoCurta ? `
+        ${rowsHtml(p)}
+        ${role === 'mensal' && p.descricaoCurta ? `
           <div class="offer-plan-card__desc-solo">
             <span class="offer-plan-card__row-icon">${SB_ICON.checkCircle}</span>
             <span>${SB_UI.escapeHtml(p.descricaoCurta)}</span>
@@ -160,28 +200,42 @@
       </div>`;
   }
 
-  if (!oferta.planos || oferta.planos.length === 0) {
+  // Faixa secundária (ex.: Semestral) — não compete visualmente com o
+  // Anual: um único indicador de desconto (nunca badge + pill repetindo o
+  // mesmo "10% OFF"), CTA discreto, layout horizontal no desktop.
+  function secondaryBannerHtml(p) {
+    const precoFormatado = SB_UI.formatCurrency(p.valor);
+    return `
+      <div class="offer-secondary" data-role="secundario" data-plan-id="${p.id}">
+        <div class="offer-secondary__intro">
+          <span class="offer-secondary__question">Quer economizar sem fechar um ano?</span>
+          <span class="offer-secondary__name">${SB_UI.escapeHtml(p.nome)}</span>
+          ${p.descontoPercent > 0 ? `<span class="offer-secondary__discount">${p.descontoPercent}% OFF</span>` : ''}
+        </div>
+        <div class="offer-secondary__price-block">
+          ${p.valorReferencia != null ? `<span class="offer-secondary__reference">${SB_UI.formatCurrency(p.valorReferencia)}</span>` : ''}
+          <span class="offer-secondary__price">${precoFormatado}</span>
+        </div>
+        ${rowsHtml(p).replace('offer-plan-card__rows', 'offer-plan-card__rows offer-secondary__rows')}
+        <div class="offer-secondary__cta">
+          <button type="button" class="offer-plan-card__btn offer-plan-card__btn--accent" data-choose="${p.id}">
+            Escolher ${SB_UI.escapeHtml(p.nome).toLowerCase()}
+          </button>
+        </div>
+      </div>`;
+  }
+
+  const { mensal, anual, doisAnos, secundarios } = classificarPlanos(oferta.planos);
+
+  if (!mensal && !anual && !doisAnos && secundarios.length === 0) {
     errorState('Nenhum plano disponível', 'Esta oferta não tem planos ativos no momento. Entre em contato para receber um novo link.');
     return;
   }
-
-  // Ordem comercial fixa (Mensal → Semestral → Anual → 2 anos): recorrentes
-  // mensais primeiro, depois pagamento único crescente por duração — nunca
-  // pelo nome do plano. Só reordena a fileira; o destaque visual (dourado,
-  // glow, altura) continua vindo exclusivamente de plano.destaque, então o
-  // featured não muda de posição por causa disso.
-  oferta.planos = [...oferta.planos].sort((a, b) => {
-    const tipoA = a.tipoCobranca === 'recurring_monthly' ? 0 : 1;
-    const tipoB = b.tipoCobranca === 'recurring_monthly' ? 0 : 1;
-    if (tipoA !== tipoB) return tipoA - tipoB;
-    return (a.duracaoMeses || 0) - (b.duracaoMeses || 0);
-  });
 
   const tituloHtml = oferta.titulo
     ? `<span class="offer-header__title-line1">${SB_UI.escapeHtml(oferta.titulo)}</span>`
     : `<span class="offer-header__title-line1">Escolha o</span><span class="offer-header__title-line2">plano ideal</span>`;
   const tagline = oferta.mensagem || 'Escolha a opção que melhor combina com você. Quanto maior o período, maior a economia.';
-  const gridCount = Math.min(Math.max(oferta.planos.length, 1), 4);
 
   region.innerHTML = `
     <div class="offer-header">
@@ -191,7 +245,12 @@
       <div class="offer-header__subtitle">Mais tempo, mais economia</div>
       <div class="offer-header__message">${SB_UI.escapeHtml(tagline)}</div>
     </div>
-    <div class="offer-plan-grid" data-count="${gridCount}">${oferta.planos.map(planCardHtml).join('')}</div>
+    <div class="offer-hero-row">
+      ${mensal ? heroCardHtml(mensal, 'mensal') : ''}
+      ${anual ? heroCardHtml(anual, 'anual') : ''}
+      ${doisAnos ? heroCardHtml(doisAnos, 'doisAnos') : ''}
+      ${secundarios.map(secondaryBannerHtml).join('')}
+    </div>
     <div class="offer-footer-note">${SB_ICON.shield}<span>Formas de pagamento disponíveis no checkout.</span></div>
     <div class="offer-brand offer-brand--footer">
       <img class="offer-brand__icon" src="assets/img/logo.svg" alt="" />

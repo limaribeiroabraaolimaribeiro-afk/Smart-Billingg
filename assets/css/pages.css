@@ -325,10 +325,11 @@
 .rank-row__value { font-weight: 800; font-size: 12.5px; }
 
 /* ==========================================================================
-   Página pública da oferta de planos (oferta.html) — landing page premium,
-   independente do .plan-card usado no painel administrativo (planos.js):
-   nenhuma classe abaixo é compartilhada com outras páginas, então este
-   redesign não afeta a listagem interna de Planos.
+   Página pública da oferta de planos (oferta.html) — reconstruída como
+   vitrine de marketing de posição fixa (Mensal | Anual protagonista | 2
+   anos), não um grid genérico de N cards. Independente do .plan-card do
+   painel administrativo (planos.js): nenhuma classe abaixo é compartilhada
+   com outras páginas.
    ========================================================================== */
 .offer-page {
   position: relative;
@@ -338,7 +339,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: var(--space-10) var(--space-4) var(--space-12);
+  padding: 28px var(--space-4) 48px;
   background: #030309;
   color: #fff;
 
@@ -353,7 +354,7 @@
   --offer-border: rgba(255, 255, 255, 0.09);
   --offer-text-dim: rgba(226, 232, 255, 0.6);
 }
-/* Glow ambiente + textura de pontos/feixes — camadas fixas atrás do conteúdo
+/* Glow ambiente + textura de pontos — camadas fixas atrás do conteúdo
    (position:fixed cobre a viewport inteira mesmo com a página rolando). */
 .offer-page::before {
   content: "";
@@ -362,11 +363,9 @@
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 900px 520px at 22% 8%, rgba(243, 200, 105, 0.16), transparent 65%),
-    radial-gradient(ellipse 900px 560px at 82% 12%, rgba(139, 92, 246, 0.2), transparent 65%),
-    radial-gradient(ellipse 1100px 600px at 50% 108%, rgba(40, 30, 70, 0.6), transparent 60%),
-    linear-gradient(118deg, transparent 34%, rgba(243, 200, 105, 0.045) 36%, transparent 38%),
-    linear-gradient(118deg, transparent 52%, rgba(173, 139, 250, 0.05) 54%, transparent 57%);
+    radial-gradient(ellipse 900px 480px at 20% 0%, rgba(243, 200, 105, 0.14), transparent 65%),
+    radial-gradient(ellipse 900px 500px at 84% 6%, rgba(139, 92, 246, 0.18), transparent 65%),
+    radial-gradient(ellipse 1100px 560px at 50% 100%, rgba(40, 30, 70, 0.55), transparent 60%);
 }
 .offer-page::after {
   content: "";
@@ -376,14 +375,15 @@
   pointer-events: none;
   background-image: radial-gradient(rgba(243, 200, 105, 0.9) 1px, transparent 1.6px);
   background-size: 30px 30px;
-  -webkit-mask-image: radial-gradient(ellipse 640px 520px at 4% 96%, black, transparent 70%);
-  mask-image: radial-gradient(ellipse 640px 520px at 4% 96%, black, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 600px 480px at 4% 96%, black, transparent 70%);
+  mask-image: radial-gradient(ellipse 600px 480px at 4% 96%, black, transparent 70%);
   opacity: 0.5;
 }
-.offer-wrap { position: relative; z-index: 1; width: 100%; max-width: 1160px; }
+.offer-wrap { position: relative; z-index: 1; width: 100%; max-width: 1180px; }
 
-/* ---------- Header ---------- */
-.offer-header { text-align: center; margin-bottom: var(--space-12); }
+/* ---------- Header (compacto de propósito — precisa sobrar espaço pros
+   3 cards + CTAs caberem sem rolar em 1440x900/1920x1080) ---------- */
+.offer-header { text-align: center; margin-bottom: 22px; }
 
 /* Marca em HTML/CSS (ícone SVG + texto), não a logo.png com mix-blend-mode
    usada em outras páginas públicas: dentro do stacking context isolado por
@@ -391,142 +391,131 @@
    blend do PNG passa a comparar contra um backdrop transparente e sobra uma
    caixa escura visível — o ícone SVG (fundo transparente de verdade) não
    tem esse problema. */
-.offer-brand { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: var(--space-8); opacity: 0.85; }
-.offer-brand__icon { width: 22px; height: 22px; display: block; }
-.offer-brand__text { font-size: 13px; font-weight: 800; letter-spacing: -0.01em; color: #fff; }
+.offer-brand { display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 12px; opacity: 0.85; }
+.offer-brand__icon { width: 19px; height: 19px; display: block; }
+.offer-brand__text { font-size: 12px; font-weight: 800; letter-spacing: -0.01em; color: #fff; }
 .offer-brand__text strong {
   font-weight: 800;
   background: linear-gradient(120deg, var(--blue-400), var(--offer-purple));
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .offer-header__greeting {
-  display: flex; align-items: center; justify-content: center; gap: 7px;
-  font-size: 13.5px; font-weight: 700; letter-spacing: 0.02em;
-  color: var(--offer-gold); margin-bottom: var(--space-5);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+  color: var(--offer-gold); margin-bottom: 8px;
 }
-.offer-header__title {
-  margin-bottom: var(--space-5);
-}
+.offer-header__title { margin-bottom: 10px; }
 .offer-header__title-line1 {
   display: block;
-  font-size: clamp(22px, 4vw, 30px);
+  font-size: clamp(17px, 2.2vw, 23px);
   font-weight: 800;
   color: #fff;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
   line-height: 1.2;
 }
 .offer-header__title-line2 {
   display: block;
-  font-size: clamp(46px, 9.5vw, 92px);
+  font-size: clamp(48px, 6vw, 88px);
   font-weight: 800;
   letter-spacing: -0.02em;
-  line-height: 1.05;
+  line-height: 0.98;
   margin-top: 2px;
   background: linear-gradient(115deg, var(--offer-gold-soft) 10%, var(--offer-gold) 45%, var(--offer-gold-deep) 90%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 4px 30px rgba(243, 200, 105, 0.25));
+  filter: drop-shadow(0 4px 22px rgba(243, 200, 105, 0.22));
 }
 .offer-header__subtitle {
-  display: flex; align-items: center; justify-content: center; gap: 16px;
-  font-size: 13px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
   color: var(--offer-text-dim);
+  margin-top: 10px;
 }
 .offer-header__subtitle::before,
 .offer-header__subtitle::after {
-  content: ""; width: 40px; height: 1px;
+  content: ""; width: 32px; height: 1px;
   background: linear-gradient(90deg, transparent, var(--offer-gold-deep));
 }
 .offer-header__subtitle::after { background: linear-gradient(90deg, var(--offer-gold-deep), transparent); }
 .offer-header__message {
-  margin: var(--space-5) auto 0; max-width: 460px;
-  font-size: 14px; line-height: 1.55; color: var(--offer-text-dim);
+  margin: 10px auto 0; max-width: 440px;
+  font-size: 13px; line-height: 1.45; color: var(--offer-text-dim);
 }
 
-
-/* ---------- Grid de planos ---------- */
-.offer-plan-grid {
+/* ---------- Fileira principal: Mensal | Anual (protagonista) | 2 anos ----------
+   Um único flex container cuida dos 2 layouts (desktop 3-lado-a-lado /
+   mobile empilhado) só trocando `order`+`flex-basis` por media query — não
+   precisa de DOM diferente nem de duplicar markup. */
+.offer-hero-row {
   position: relative; z-index: 1;
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: var(--space-6);
-  align-items: end;
+  align-items: flex-end;
+  gap: 20px;
   width: 100%;
-  /* Espaço reservado pra fita/badge do card featured, que "sobe" acima da
-     grade (margin-top negativo no card) — sem isso ela sobrepõe o texto
-     do header em vez de flutuar sobre um fundo vazio. */
-  margin-top: 80px;
-}
-.offer-plan-grid[data-count="1"] { grid-template-columns: minmax(0, 300px); }
-.offer-plan-grid[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 290px)); }
-.offer-plan-grid[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 290px)); }
-.offer-plan-grid[data-count="4"] { grid-template-columns: repeat(4, minmax(0, 270px)); }
-@media (max-width: 980px) {
-  .offer-plan-grid[data-count="3"],
-  .offer-plan-grid[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 290px)); }
-}
-@media (max-width: 640px) {
-  .offer-plan-grid { grid-template-columns: minmax(0, 340px) !important; margin-top: 22px; }
 }
 
-/* ---------- Card ---------- */
-/* "Totem" vertical — estreito e alto, não uma caixa larga e baixa. */
 .offer-plan-card {
   position: relative;
   display: flex; flex-direction: column; align-items: center; text-align: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: 470px;
+  gap: 8px;
   background: var(--offer-card-bg);
   border: 1px solid var(--offer-border);
-  border-radius: 30px;
-  padding: 46px 22px 26px;
-  box-shadow: 0 24px 55px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  opacity: 0; transform: translateY(28px);
-  animation: offerCardIn 0.65s var(--ease-out) forwards;
+  border-radius: 26px;
+  padding: 32px 18px 18px;
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  opacity: 0; transform: translateY(20px);
+  animation: offerCardIn 0.5s var(--ease-out) forwards;
+  flex: 0 1 290px;
+  max-width: 300px;
+  min-height: 500px;
+  order: 5;
 }
-.offer-plan-card:nth-child(1) { animation-delay: 0.05s; }
-.offer-plan-card:nth-child(2) { animation-delay: 0.16s; }
-.offer-plan-card:nth-child(3) { animation-delay: 0.27s; }
-.offer-plan-card:nth-child(4) { animation-delay: 0.38s; }
+.offer-plan-card[data-role="mensal"] { order: 1; animation-delay: 0.03s; }
+.offer-plan-card[data-role="anual"] {
+  order: 2;
+  flex-basis: 330px;
+  max-width: 350px;
+  min-height: 555px;
+  z-index: 2;
+  animation-delay: 0.1s;
+  border-color: rgba(243, 200, 105, 0.6);
+  box-shadow: 0 0 0 1px rgba(243, 200, 105, 0.4), 0 10px 24px rgba(243, 200, 105, 0.2), 0 34px 76px rgba(0, 0, 0, 0.6), 0 0 60px rgba(243, 200, 105, 0.18);
+}
+.offer-plan-card[data-role="doisAnos"] {
+  order: 3;
+  animation-delay: 0.17s;
+  border-color: rgba(173, 139, 250, 0.5);
+  box-shadow: 0 0 0 1px rgba(173, 139, 250, 0.3), 0 24px 56px rgba(0, 0, 0, 0.5), 0 0 44px rgba(109, 40, 217, 0.16);
+}
+.offer-secondary { order: 4; }
+
 @keyframes offerCardIn { to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .offer-plan-card { opacity: 1; transform: none; animation: none; }
+  .offer-plan-card, .offer-secondary { opacity: 1; transform: none; animation: none; }
 }
 @media (hover: hover) {
   .offer-plan-card { transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base); }
   .offer-plan-card:hover { transform: translateY(-6px); border-color: rgba(255, 255, 255, 0.22); }
+  .offer-plan-card[data-role="anual"]:hover { transform: translateY(-10px); }
 }
 
-.offer-plan-card--featured {
-  min-height: 560px;
-  border-color: rgba(243, 200, 105, 0.6);
-  box-shadow: 0 0 0 1px rgba(243, 200, 105, 0.4), 0 8px 20px rgba(243, 200, 105, 0.18), 0 40px 90px rgba(0, 0, 0, 0.6), 0 0 70px rgba(243, 200, 105, 0.16);
-  z-index: 2;
-}
-.offer-plan-card--accent {
-  border-color: rgba(173, 139, 250, 0.5);
-  box-shadow: 0 0 0 1px rgba(173, 139, 250, 0.3), 0 30px 70px rgba(0, 0, 0, 0.55), 0 0 50px rgba(109, 40, 217, 0.16);
-}
-@media (min-width: 641px) {
-  .offer-plan-card--featured { margin-top: -46px; padding-top: 60px; }
-}
-@media (hover: hover) {
-  .offer-plan-card--featured:hover { transform: translateY(-16px); }
-  .offer-plan-card--accent:hover { box-shadow: 0 0 0 1px rgba(173, 139, 250, 0.55), 0 34px 74px rgba(0, 0, 0, 0.55), 0 0 60px rgba(109, 40, 217, 0.24); }
-}
-
-/* Badge featured: fita/banner com ponta (não um pill comum). */
+/* Badge: fita/banner com ponta pro Anual (protagonista, maior); pill roxo
+   pro 2 anos. Um só indicador por informação — o desconto (%) fica só no
+   pill de desconto abaixo, nunca repetido aqui. */
 .offer-plan-card__badge {
-  position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
   display: inline-flex; align-items: center; gap: 5px;
-  white-space: nowrap; font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+  white-space: nowrap; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.45);
+  font-size: 10.5px;
 }
 .offer-plan-card__badge svg { width: 11px; height: 11px; }
 .offer-plan-card__badge--gold {
-  padding: 10px 22px 14px;
+  font-size: 12px;
+  padding: 11px 24px 15px;
   background: linear-gradient(135deg, var(--offer-gold-soft), var(--offer-gold) 50%, var(--offer-gold-deep));
   color: #3a2606;
   clip-path: polygon(0 0, 100% 0, 100% 74%, 50% 100%, 0 74%);
@@ -539,93 +528,140 @@
 }
 
 .offer-plan-card__icon {
-  width: 50px; height: 50px; border-radius: 50%;
+  width: 46px; height: 46px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: rgba(255, 255, 255, 0.65);
   margin-bottom: 2px;
 }
-.offer-plan-card__icon svg { width: 20px; height: 20px; }
-.offer-plan-card--featured .offer-plan-card__icon { color: var(--offer-gold); border-color: rgba(243, 200, 105, 0.55); box-shadow: 0 0 22px rgba(243, 200, 105, 0.35); }
-.offer-plan-card--accent .offer-plan-card__icon { color: var(--offer-purple); border-color: rgba(173, 139, 250, 0.55); box-shadow: 0 0 22px rgba(109, 40, 217, 0.35); }
+.offer-plan-card__icon svg { width: 19px; height: 19px; }
+.offer-plan-card[data-role="anual"] .offer-plan-card__icon { color: var(--offer-gold); border-color: rgba(243, 200, 105, 0.55); box-shadow: 0 0 20px rgba(243, 200, 105, 0.32); }
+.offer-plan-card[data-role="doisAnos"] .offer-plan-card__icon { color: var(--offer-purple); border-color: rgba(173, 139, 250, 0.55); box-shadow: 0 0 20px rgba(109, 40, 217, 0.32); }
 
-.offer-plan-card__name { font-size: 14px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(255, 255, 255, 0.65); }
+.offer-plan-card__name { font-size: 13.5px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(255, 255, 255, 0.65); }
 .offer-plan-card__name::after {
-  content: ""; display: block; width: 28px; height: 2px; margin: 10px auto 0;
+  content: ""; display: block; width: 26px; height: 2px; margin: 8px auto 0;
   background: rgba(255, 255, 255, 0.2); border-radius: 2px;
 }
-.offer-plan-card--featured .offer-plan-card__name::after { background: var(--offer-gold); }
-.offer-plan-card--accent .offer-plan-card__name::after { background: var(--offer-purple); }
+.offer-plan-card[data-role="anual"] .offer-plan-card__name::after { background: var(--offer-gold); }
+.offer-plan-card[data-role="doisAnos"] .offer-plan-card__name::after { background: var(--offer-purple); }
 
 .offer-plan-card__discount {
   font-size: 11.5px; font-weight: 800; padding: 4px 14px; border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.8);
 }
-.offer-plan-card--featured .offer-plan-card__discount { background: rgba(243, 200, 105, 0.16); color: var(--offer-gold); }
-.offer-plan-card--accent .offer-plan-card__discount { background: rgba(173, 139, 250, 0.18); color: var(--offer-purple); }
+.offer-plan-card[data-role="anual"] .offer-plan-card__discount { background: rgba(243, 200, 105, 0.16); color: var(--offer-gold); }
+.offer-plan-card[data-role="doisAnos"] .offer-plan-card__discount { background: rgba(173, 139, 250, 0.18); color: var(--offer-purple); }
 
-.offer-plan-card__price-block { margin-top: 2px; }
-.offer-plan-card__reference { font-size: 13px; color: rgba(255, 255, 255, 0.4); text-decoration: line-through; }
-.offer-plan-card__price { font-size: clamp(34px, 9vw, 46px); font-weight: 800; letter-spacing: -0.025em; color: #fff; line-height: 1.05; }
-.offer-plan-card--featured .offer-plan-card__price { font-size: clamp(38px, 10vw, 54px); }
-.offer-plan-card__price span { font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.5); }
+.offer-plan-card__price-block { margin-top: 1px; }
+.offer-plan-card__reference { font-size: 12.5px; color: rgba(255, 255, 255, 0.4); text-decoration: line-through; }
 
-/* Painel inferior de informações — bloco próprio, não só uma borda solta. */
+/* Preço: clamp por tamanho de texto (calculado em JS a partir do valor real
+   — nunca hardcoded por plano) pra nunca ultrapassar a largura do card,
+   mesmo quando o valor formatado é bem mais comprido (R$ 190 x R$ 12.345,00). */
+.offer-plan-card__price {
+  font-weight: 800; letter-spacing: -0.02em; color: #fff; line-height: 1.05;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.offer-plan-card__price.is-price-lg { font-size: clamp(30px, 5.2vw, 42px); }
+.offer-plan-card__price.is-price-md { font-size: clamp(26px, 4.6vw, 36px); }
+.offer-plan-card__price.is-price-sm { font-size: clamp(22px, 3.8vw, 29px); }
+.offer-plan-card[data-role="anual"] .offer-plan-card__price.is-price-lg { font-size: clamp(34px, 6vw, 48px); }
+.offer-plan-card[data-role="anual"] .offer-plan-card__price.is-price-md { font-size: clamp(29px, 5.2vw, 40px); }
+.offer-plan-card[data-role="anual"] .offer-plan-card__price.is-price-sm { font-size: clamp(24px, 4.3vw, 32px); }
+.offer-plan-card__price span { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.5); white-space: nowrap; }
+
 .offer-plan-card__rows {
-  width: 100%; display: flex; flex-direction: column; gap: 10px;
-  margin-top: 4px; padding: 14px 14px;
+  width: 100%; display: flex; flex-direction: column; gap: 8px;
+  margin-top: 2px; padding: 12px 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 16px;
+  border-radius: 14px;
 }
-.offer-plan-card__row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: rgba(255, 255, 255, 0.7); text-align: left; }
+.offer-plan-card__row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: rgba(255, 255, 255, 0.7); text-align: left; }
 .offer-plan-card__row-icon {
-  flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: rgba(255, 255, 255, 0.07); color: rgba(255, 255, 255, 0.6);
 }
-.offer-plan-card__row-icon svg { width: 12px; height: 12px; }
-.offer-plan-card--featured .offer-plan-card__row-icon { background: rgba(243, 200, 105, 0.16); color: var(--offer-gold); }
-.offer-plan-card--accent .offer-plan-card__row-icon { background: rgba(173, 139, 250, 0.18); color: var(--offer-purple); }
+.offer-plan-card__row-icon svg { width: 11px; height: 11px; }
+.offer-plan-card[data-role="anual"] .offer-plan-card__row-icon { background: rgba(243, 200, 105, 0.16); color: var(--offer-gold); }
+.offer-plan-card[data-role="doisAnos"] .offer-plan-card__row-icon { background: rgba(173, 139, 250, 0.18); color: var(--offer-purple); }
 .offer-plan-card__row strong { color: #fff; font-weight: 700; }
 
-/* Plano sem linhas de equivalente/economia (ex.: Mensal) — descrição
-   simples e centralizada, sem o painel com borda dos planos com mais dados
-   a mostrar (mesma leitura da referência: só um ícone + texto soltos). */
+/* Mensal sem linhas de equivalente/economia — descrição simples e
+   centralizada, sem painel com borda (mesma leitura da referência). */
 .offer-plan-card__desc-solo {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  margin-top: 4px; font-size: 12.5px; color: rgba(255, 255, 255, 0.55);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  margin-top: 2px; font-size: 12px; color: rgba(255, 255, 255, 0.55);
 }
-.offer-plan-card__desc-solo .offer-plan-card__row-icon { width: 30px; height: 30px; }
-.offer-plan-card__desc-solo .offer-plan-card__row-icon svg { width: 14px; height: 14px; }
+.offer-plan-card__desc-solo .offer-plan-card__row-icon { width: 28px; height: 28px; }
+.offer-plan-card__desc-solo .offer-plan-card__row-icon svg { width: 13px; height: 13px; }
 
-.offer-plan-card__cta { width: 100%; margin-top: auto; padding-top: var(--space-3); }
+.offer-plan-card__cta { width: 100%; margin-top: auto; padding-top: 10px; }
 .offer-plan-card__btn {
-  width: 100%; min-height: 52px; padding: 14px 18px; border-radius: 15px;
-  font-size: 15px; font-weight: 800; font-family: inherit;
+  width: 100%; min-height: 48px; padding: 13px 18px; border-radius: 14px;
+  font-size: 14.5px; font-weight: 800; font-family: inherit;
   border: none; cursor: pointer;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast);
 }
 .offer-plan-card__btn--default { background: rgba(255, 255, 255, 0.07); color: rgba(255, 255, 255, 0.9); border: 1px solid rgba(255, 255, 255, 0.16); }
 .offer-plan-card__btn--featured {
   background: linear-gradient(135deg, var(--offer-gold-soft) 0%, var(--offer-gold) 45%, var(--offer-gold-deep) 100%);
-  color: #2c1e04; box-shadow: 0 16px 34px rgba(243, 200, 105, 0.4);
+  color: #2c1e04; box-shadow: 0 14px 30px rgba(243, 200, 105, 0.4);
 }
 .offer-plan-card__btn--accent {
   background: linear-gradient(135deg, var(--offer-purple-soft) 0%, var(--offer-purple) 45%, var(--offer-purple-deep) 100%);
-  color: #fff; box-shadow: 0 16px 34px rgba(109, 40, 217, 0.4);
+  color: #fff; box-shadow: 0 14px 30px rgba(109, 40, 217, 0.4);
 }
 @media (hover: hover) {
   .offer-plan-card__btn:not(:disabled):hover { transform: translateY(-2px); filter: brightness(1.08); }
 }
 .offer-plan-card__btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
+/* ---------- Semestral (e qualquer outra duração) — oferta secundária,
+   faixa horizontal discreta no desktop, nunca competindo com o Anual.
+   Um único indicador de desconto (sem repetir badge + pill). ---------- */
+.offer-secondary {
+  position: relative; z-index: 1;
+  flex-basis: 100%;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 16px;
+  background: linear-gradient(120deg, rgba(109, 40, 217, 0.14), rgba(18, 14, 32, 0.6));
+  border: 1px solid rgba(173, 139, 250, 0.35);
+  border-radius: 20px;
+  padding: 16px 24px;
+  opacity: 0; transform: translateY(14px);
+  animation: offerCardIn 0.5s var(--ease-out) 0.24s forwards;
+  max-width: 100%;
+}
+.offer-secondary__intro { display: flex; flex-direction: column; gap: 3px; text-align: left; }
+.offer-secondary__question { font-size: 12px; color: rgba(255, 255, 255, 0.6); font-weight: 600; }
+.offer-secondary__name { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #fff; }
+.offer-secondary__discount {
+  display: inline-block; font-size: 10.5px; font-weight: 800; color: var(--offer-purple);
+  background: rgba(173, 139, 250, 0.18); padding: 3px 10px; border-radius: var(--radius-pill);
+}
+.offer-secondary__price-block { display: flex; align-items: baseline; gap: 8px; }
+.offer-secondary__reference { font-size: 12.5px; color: rgba(255, 255, 255, 0.4); text-decoration: line-through; }
+.offer-secondary__price { font-size: clamp(22px, 3vw, 30px); font-weight: 800; color: #fff; white-space: nowrap; }
+.offer-secondary__rows.offer-plan-card__rows {
+  flex-direction: row; flex-wrap: wrap; gap: 16px;
+  background: none; border: none; padding: 0; margin: 0; width: auto;
+}
+.offer-secondary__rows .offer-plan-card__row { font-size: 11.5px; }
+.offer-secondary__cta { flex-shrink: 0; }
+.offer-secondary__cta .offer-plan-card__btn {
+  width: auto; min-width: 190px; padding: 11px 24px; min-height: 42px; font-size: 13px;
+}
+
 /* ---------- Rodapé ---------- */
 .offer-footer-note {
   position: relative; z-index: 1;
   display: flex; align-items: center; justify-content: center; gap: 7px;
-  margin-top: var(--space-12); font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.45);
+  margin-top: 28px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.45);
 }
 .offer-footer-note svg { width: 15px; height: 15px; color: var(--offer-gold); }
 
@@ -645,9 +681,39 @@
 .offer-state-card .state-block__desc { color: rgba(255, 255, 255, 0.6); }
 .offer-state-card .state-block__icon { background: rgba(255, 255, 255, 0.06); }
 
+/* ---------- Responsivo ----------
+   Abaixo de ~900px não há espaço confortável pros 3 totens lado a lado —
+   empilha em coluna única, com o Anual (a opção comercial que queremos
+   vender) sempre primeiro, depois Mensal, Semestral e 2 anos. */
+@media (max-width: 900px) {
+  .offer-hero-row { flex-direction: column; align-items: stretch; gap: 16px; }
+  .offer-plan-card,
+  .offer-secondary {
+    flex-basis: auto; max-width: 480px; width: 100%; margin: 0 auto;
+    min-height: 0;
+  }
+  .offer-plan-card[data-role="anual"] { order: 1; max-width: 480px; }
+  .offer-plan-card[data-role="mensal"] { order: 2; }
+  .offer-secondary { order: 3; }
+  .offer-plan-card[data-role="doisAnos"] { order: 4; }
+
+  .offer-secondary {
+    flex-direction: column; align-items: stretch; text-align: center;
+    padding: 28px 20px; border-radius: 26px;
+  }
+  .offer-secondary__intro { align-items: center; text-align: center; }
+  .offer-secondary__price-block { justify-content: center; }
+  .offer-secondary__rows.offer-plan-card__rows {
+    flex-direction: column; align-items: flex-start;
+    background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px; padding: 12px; margin-top: 4px; width: 100%;
+  }
+  .offer-secondary__cta { width: 100%; }
+  .offer-secondary__cta .offer-plan-card__btn { width: 100%; }
+}
+
 @media (max-width: 480px) {
-  .offer-page { padding: var(--space-8) var(--space-3) var(--space-10); }
-  .offer-header { margin-bottom: var(--space-9); }
-  .offer-plan-card { padding: 42px 20px 22px; min-height: 0; }
-  .offer-plan-card--featured { margin-top: 0; padding-top: 46px; }
+  .offer-page { padding: 22px var(--space-3) 40px; }
+  .offer-header { margin-bottom: 20px; }
+  .offer-plan-card { padding: 30px 16px 16px; }
 }
