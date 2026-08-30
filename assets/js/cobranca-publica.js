@@ -65,6 +65,12 @@
   const clienteNome = cobranca.cliente?.nome || 'Cliente';
   const statusMeta = SB_UI.statusMeta(cobranca.status);
 
+  // valorAtualizado já vem calculado do servidor (banco em modo real,
+  // calculateLateCharges em modo demo) — nunca calculado aqui. Sem atraso,
+  // é sempre igual a cobranca.valor.
+  const valorExibido = cobranca.valorAtualizado != null ? cobranca.valorAtualizado : cobranca.valor;
+  const temEncargos = cobranca.status === 'atrasado' && (cobranca.diasAtraso || 0) > 0 && valorExibido > cobranca.valor;
+
   function heroBlock() {
     return `
       <div class="public-card__hero">
@@ -73,7 +79,7 @@
         <div class="public-card__company">${SB_UI.escapeHtml(empresaNome)}</div>
         <div class="public-card__client">Cobrança para ${SB_UI.escapeHtml(clienteNome)}</div>
         <div class="public-card__amount-label">Valor a pagar</div>
-        <div class="public-card__amount">${SB_UI.formatCurrency(cobranca.valor)}</div>
+        <div class="public-card__amount">${SB_UI.formatCurrency(valorExibido)}</div>
       </div>`;
   }
 
@@ -142,8 +148,40 @@
     return;
   }
 
-  // ---- Overdue notice (still payable, just flagged) ----
-  const overdueNotice = cobranca.status === 'atrasado' ? `
+  // ---- Aviso discreto ANTES do vencimento (transparência exigida por lei:
+  // a condição de atraso precisa ser informada antes de incidir) ----
+  const avisoPreVencimento = cobranca.status !== 'atrasado' && cobranca.multaAtiva !== false ? `
+    <div class="secure-note" style="margin-top:var(--space-5);text-align:center;">
+      <span>Após o vencimento, poderão incidir multa de ${cobranca.multaPercent}% e juros de mora de ${cobranca.jurosPercentMes}% ao mês, calculados proporcionalmente aos dias de atraso.</span>
+    </div>` : '';
+
+  // ---- Painel de situação/encargos, no estilo "TMB", só quando vencida e
+  // realmente com valor maior que o original ----
+  const painelAtraso = temEncargos ? `
+    <div class="auth-alert" style="margin-top:16px;flex-direction:column;align-items:stretch;gap:4px;">
+      <strong style="display:flex;align-items:center;gap:8px;">${SB_ICON.alertTriangle}SITUAÇÃO DA COBRANÇA</strong>
+      <span>Pagamento em atraso — vencida há ${cobranca.diasAtraso} ${cobranca.diasAtraso === 1 ? 'dia' : 'dias'}.</span>
+    </div>
+
+    <div class="public-card__panel" style="margin-top:12px;">
+      <div class="public-section-title" style="margin-top:0;">Dados da cobrança</div>
+      <div class="public-info-row"><span class="label">Valor original</span><span class="value">${SB_UI.formatCurrency(cobranca.valor)}</span></div>
+      <div class="public-info-row"><span class="label">Vencimento</span><span class="value">${SB_UI.formatDate(cobranca.vencimento)}</span></div>
+    </div>
+
+    <div class="public-card__panel" style="margin-top:12px;">
+      <div class="public-section-title" style="margin-top:0;">Encargos por atraso</div>
+      <div class="public-info-row"><span class="label">Multa (${cobranca.multaPercent}%)</span><span class="value">${SB_UI.formatCurrency(cobranca.multaValor)}</span></div>
+      <div class="public-info-row"><span class="label">Juros de mora (${cobranca.jurosPercentMes}% a.m.)</span><span class="value">${SB_UI.formatCurrency(cobranca.jurosValor)}</span></div>
+    </div>
+
+    <div class="public-card__panel" style="margin-top:12px;background:var(--gradient-brand-soft);">
+      <div class="public-info-row" style="border-bottom:none;">
+        <span class="label" style="font-weight:800;color:var(--text-primary);">Valor atualizado hoje</span>
+        <span class="value" style="font-size:19px;">${SB_UI.formatCurrency(valorExibido)}</span>
+      </div>
+    </div>
+    <p class="state-block__desc" style="margin-top:8px;">Valor atualizado até ${SB_UI.formatDate(cobranca.calculadoEm || new Date())}.</p>` : cobranca.status === 'atrasado' ? `
     <div class="auth-alert" style="margin-top:16px;">
       ${SB_ICON.alertTriangle}
       <span>Esta cobrança está vencida desde ${SB_UI.formatDate(cobranca.vencimento)}. Regularize o quanto antes.</span>
@@ -155,12 +193,14 @@
   // página prometeria algo que o clique em "Pagar agora" não cumpre (o
   // redirecionamento é sempre para o checkout_url já pronto, de qualquer forma).
   const hasCheckout = Boolean(cobranca.checkoutUrl);
+  const isOverdue = cobranca.status === 'atrasado';
 
   region.innerHTML = shell(`
     ${heroBlock()}
     <div class="public-card__body">
       ${infoPanel()}
-      ${overdueNotice}
+      ${painelAtraso}
+      ${avisoPreVencimento}
 
       <div class="secure-note" style="margin-top:var(--space-5);">
         ${SB_ICON.wallet}
@@ -168,7 +208,7 @@
       </div>
 
       <button class="btn btn-primary btn-block pay-btn-fixed" id="pay-btn">
-        <span>Pagar agora · ${SB_UI.formatCurrency(cobranca.valor)}</span>
+        <span id="pay-btn-label">Pagar agora · ${SB_UI.formatCurrency(valorExibido)}</span>
       </button>
 
       <div class="secure-note">
@@ -179,7 +219,48 @@
   `);
   appendFooter();
 
-  document.getElementById('pay-btn').addEventListener('click', () => {
+  const payBtn = document.getElementById('pay-btn');
+  const payBtnLabel = document.getElementById('pay-btn-label');
+
+  function goToCheckout(url) {
+    if (!isTrustedCheckoutUrl(url)) {
+      SB_UI.toast({ type: 'error', title: 'Não foi possível abrir o pagamento', desc: 'Tente novamente em instantes.' });
+      return;
+    }
+    // Redireciona para o Checkout Integrado real da InfinitePay.
+    window.location.href = url;
+  }
+
+  payBtn.addEventListener('click', async () => {
+    // Cobrança vencida: o checkout_url já carregado pode ter sido gerado
+    // com o valor original (sem multa/juros) — nunca reaproveita direto.
+    // O servidor recalcula e trava o valor de hoje antes de gerar um link
+    // novo (create-checkout-for-token / resolveChargeCheckoutUrl).
+    if (isOverdue) {
+      payBtn.disabled = true;
+      const originalLabel = payBtnLabel.textContent;
+      payBtnLabel.textContent = 'Calculando valor atualizado…';
+      try {
+        const result = await DB.cobrancas.gerarCheckoutAtualizado(token);
+        if (result?.success && result.checkout_url) {
+          goToCheckout(result.checkout_url);
+          return;
+        }
+        SB_UI.toast({
+          type: 'error',
+          title: 'Não foi possível gerar o pagamento atualizado',
+          desc: result?.message || 'Tente novamente em instantes ou entre em contato com quem emitiu a cobrança.',
+          duration: 5500,
+        });
+      } catch (err) {
+        SB_UI.toast({ type: 'error', title: 'Não foi possível gerar o pagamento atualizado', desc: 'Tente novamente em instantes.' });
+      } finally {
+        payBtn.disabled = false;
+        payBtnLabel.textContent = originalLabel;
+      }
+      return;
+    }
+
     if (!hasCheckout) {
       SB_UI.toast({
         type: 'info',
@@ -189,11 +270,6 @@
       });
       return;
     }
-    if (!isTrustedCheckoutUrl(cobranca.checkoutUrl)) {
-      SB_UI.toast({ type: 'error', title: 'Não foi possível abrir o pagamento', desc: 'Tente novamente em instantes.' });
-      return;
-    }
-    // Redireciona para o Checkout Integrado real da InfinitePay.
-    window.location.href = cobranca.checkoutUrl;
+    goToCheckout(cobranca.checkoutUrl);
   });
 })();

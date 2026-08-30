@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: charge } = await adminClient
     .from('charges')
-    .select('id, company_id, amount, status, charge_number, max_installments')
+    .select('id, company_id, amount, updated_amount, status, charge_number, max_installments')
     .eq('public_token', payload.token)
     .maybeSingle();
 
@@ -106,9 +106,11 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(GENERIC_NOT_CONFIRMED, 200);
   }
 
+  // updated_amount (quando existir) é o valor com multa/juros travado na
+  // última vez que um checkout foi gerado pra esta cobrança vencida.
   let expectedCents: number;
   try {
-    expectedCents = reaisToCents(Number(charge.amount));
+    expectedCents = reaisToCents(Number(charge.updated_amount ?? charge.amount));
   } catch {
     return jsonResponse(GENERIC_NOT_CONFIRMED, 200);
   }

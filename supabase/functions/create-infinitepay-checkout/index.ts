@@ -22,11 +22,8 @@ import {
   handleOptions,
   jsonResponse,
   logEvent,
-  reaisToCents,
-  normalizePhoneBR,
-  isValidInfinitePayCheckoutUrl,
-  callCreateLink,
   isValidUuid,
+  resolveChargeCheckoutUrl,
 } from '../_shared/infinitepay.ts';
 
 const FN_NAME = 'create-infinitepay-checkout';
@@ -85,7 +82,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: charge, error: chargeErr } = await adminClient
     .from('charges')
-    .select('id, company_id, client_id, charge_number, description, amount, status, public_token, checkout_url, max_installments')
+    .select('id, company_id, client_id, charge_number, description, amount, due_date, status, public_token, checkout_url')
     .eq('id', chargeId)
     .maybeSingle();
 
@@ -113,80 +110,23 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ success: false, message: 'Valor da cobrança inválido.' }, 400);
   }
 
-  // Reaproveita o checkout já existente, evitando gerar links duplicados.
-  if (isValidInfinitePayCheckoutUrl(charge.checkout_url)) {
-    logEvent(FN_NAME, { charge_number: charge.charge_number, status: 'reused_existing' });
-    return jsonResponse({ success: true, checkout_url: charge.checkout_url, charge_number: charge.charge_number });
-  }
-
-  let client: { name?: string; email?: string; whatsapp?: string } | null = null;
-  if (charge.client_id) {
-    const { data: clientRow } = await adminClient
-      .from('clients')
-      .select('name, email, whatsapp')
-      .eq('id', charge.client_id)
-      .maybeSingle();
-    client = clientRow;
-  }
-
-  let amountCents: number;
-  try {
-    amountCents = reaisToCents(Number(charge.amount));
-  } catch {
-    return jsonResponse({ success: false, message: 'Valor da cobrança inválido.' }, 400);
-  }
-
+  // resolveChargeCheckoutUrl decide sozinha (a partir de due_date/status no
+  // banco) se reaproveita o checkout existente ou trava multa/juros de hoje
+  // e gera um link novo — nunca a partir de um valor vindo desta requisição.
   const redirectUrl = `${PUBLIC_APP_URL}/pagamento-confirmado.html?token=${charge.public_token}`;
   const webhookUrl = `${SUPABASE_URL}/functions/v1/infinitepay-webhook`;
 
-  const customer: Record<string, string> = {};
-  if (client?.name) customer.name = client.name;
-  if (client?.email) customer.email = client.email;
-  const phone = normalizePhoneBR(client?.whatsapp);
-  if (phone) customer.phone_number = phone;
-
-  const linkPayload = {
+  const result = await resolveChargeCheckoutUrl(adminClient, charge, {
     handle: INFINITEPAY_HANDLE,
-    redirect_url: redirectUrl,
-    webhook_url: webhookUrl,
-    order_nsu: charge.charge_number,
-    ...(Object.keys(customer).length ? { customer } : {}),
-    items: [
-      {
-        quantity: 1,
-        price: amountCents,
-        description: charge.description,
-      },
-    ],
-  };
+    redirectUrl,
+    webhookUrl,
+  });
 
-  let result;
-  try {
-    result = await callCreateLink(linkPayload);
-  } catch (err) {
-    logEvent(FN_NAME, { charge_number: charge.charge_number, error: 'network_error' });
-    return jsonResponse({ success: false, message: 'Não foi possível conectar à InfinitePay.' }, 502);
+  if (!result.ok || !result.checkoutUrl) {
+    logEvent(FN_NAME, { charge_number: charge.charge_number, error: 'resolve_checkout_failed', message: result.message });
+    return jsonResponse({ success: false, message: result.message || 'Não foi possível gerar o checkout.' }, 502);
   }
 
-  if (!result.ok || !isValidInfinitePayCheckoutUrl(result.url)) {
-    logEvent(FN_NAME, { charge_number: charge.charge_number, status: result.status, error: 'invalid_response' });
-    return jsonResponse({ success: false, message: 'A InfinitePay não retornou um checkout válido.' }, 502);
-  }
-
-  const { error: updateErr } = await adminClient
-    .from('charges')
-    .update({
-      provider: 'infinitepay',
-      provider_reference: charge.charge_number,
-      checkout_url: result.url,
-    })
-    .eq('id', charge.id);
-
-  if (updateErr) {
-    logEvent(FN_NAME, { charge_number: charge.charge_number, error: 'db_update_failed' });
-    return jsonResponse({ success: false, message: 'Checkout criado, mas não foi possível salvar. Tente novamente.' }, 500);
-  }
-
-  logEvent(FN_NAME, { charge_number: charge.charge_number, status: 'created' });
-  return jsonResponse({ success: true, checkout_url: result.url, charge_number: charge.charge_number });
+  logEvent(FN_NAME, { charge_number: charge.charge_number, status: 'resolved' });
+  return jsonResponse({ success: true, checkout_url: result.checkoutUrl, charge_number: charge.charge_number });
 });

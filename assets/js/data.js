@@ -36,6 +36,46 @@ const DB = (() => {
     return isOverdue ? 'atrasado' : 'pendente';
   }
 
+  // Multa/juros de mora — usada só pelo backend demo (o backend real delega
+  // esse cálculo inteiramente ao banco, ver sql/late_fees_and_interest.sql).
+  // Mesma fórmula exata dos dois lados: multa uma vez só, juros simples
+  // proporcionais por dia, nunca sobre parcelamento de cartão da InfinitePay
+  // — só sobre a própria due_date da cobrança. Pago/cancelado nunca
+  // recalcula: devolve o snapshot já travado, senão pareceria que os juros
+  // continuam correndo depois da confirmação do pagamento.
+  function calculateLateCharges(cobranca, empresa) {
+    if (cobranca.status === 'pago' || cobranca.status === 'cancelado') {
+      return {
+        diasAtraso: cobranca.diasAtraso || 0,
+        multaValor: cobranca.multaValor || 0,
+        jurosValor: cobranca.jurosValor || 0,
+        valorAtualizado: cobranca.valorAtualizado != null ? cobranca.valorAtualizado : cobranca.valor,
+        calculadoEm: cobranca.calculadoEm || new Date().toISOString(),
+      };
+    }
+
+    const vencimentoMeiaNoite = new Date(new Date(cobranca.vencimento).toDateString());
+    const hojeMeiaNoite = new Date(new Date().toDateString());
+    const diasAtraso = Math.max(0, Math.round((hojeMeiaNoite - vencimentoMeiaNoite) / 86400000));
+
+    let multaValor = 0;
+    let jurosValor = 0;
+    if (empresa?.lateFeeEnabled !== false && diasAtraso > 0) {
+      const multaPercent = Math.min(Number(empresa?.lateFeePercent ?? 2), 2);
+      const jurosPercentMes = Number(empresa?.lateInterestMonthlyPercent ?? 1);
+      multaValor = Math.round(cobranca.valor * (multaPercent / 100) * 100) / 100;
+      jurosValor = Math.round(cobranca.valor * (jurosPercentMes / 100) * (diasAtraso / 30) * 100) / 100;
+    }
+
+    return {
+      diasAtraso,
+      multaValor,
+      jurosValor,
+      valorAtualizado: Math.round((cobranca.valor + multaValor + jurosValor) * 100) / 100,
+      calculadoEm: new Date().toISOString(),
+    };
+  }
+
   // Agregações puras reaproveitadas pelos dois backends para o dashboard.
   function aggregateDashboard(cobrancas) {
     const now = new Date();
@@ -215,6 +255,9 @@ const DB = (() => {
           email: 'financeiro@smartbilling.com.br',
           telefone: '(11) 4000-1234',
           admin: { nome: 'Administrador Demo', email: 'admin@example.com', telefone: '(11) 99999-9999', cargo: 'Administrador' },
+          lateFeeEnabled: true,
+          lateFeePercent: 2,
+          lateInterestMonthlyPercent: 1,
         },
       };
     }
@@ -326,7 +369,43 @@ const DB = (() => {
         return delay(() => {
           const c = state.cobrancas.find((x) => x.publicToken === token);
           if (!c) return null;
-          return { ...withComputedStatus(c), cliente: state.clientes.find((cl) => cl.id === c.clienteId) || null };
+          const encargos = calculateLateCharges(c, state.empresa);
+          return {
+            ...withComputedStatus(c),
+            cliente: state.clientes.find((cl) => cl.id === c.clienteId) || null,
+            diasAtraso: encargos.diasAtraso,
+            multaValor: encargos.multaValor,
+            jurosValor: encargos.jurosValor,
+            valorAtualizado: encargos.valorAtualizado,
+            calculadoEm: encargos.calculadoEm,
+            multaAtiva: state.empresa?.lateFeeEnabled !== false,
+            multaPercent: Number(state.empresa?.lateFeePercent ?? 2),
+            jurosPercentMes: Number(state.empresa?.lateInterestMonthlyPercent ?? 1),
+          };
+        });
+      },
+      // Espelha create-checkout-for-token: em modo demo não existe gateway
+      // real, mas o cálculo/trava de multa+juros acontece igual — só o link
+      // de checkout em si não é gerado (mesma limitação de generateCheckout).
+      gerarCheckoutAtualizado(token) {
+        return delay(() => {
+          const idx = state.cobrancas.findIndex((x) => x.publicToken === token);
+          if (idx === -1) return { success: false, message: 'Cobrança não encontrada.' };
+          const c = state.cobrancas[idx];
+          if (c.status === 'pago' || c.status === 'cancelado') {
+            return { success: false, message: 'Cobrança paga ou cancelada não pode gerar checkout.' };
+          }
+          const encargos = calculateLateCharges(c, state.empresa);
+          state.cobrancas[idx] = {
+            ...c,
+            multaValor: encargos.multaValor,
+            jurosValor: encargos.jurosValor,
+            valorAtualizado: encargos.valorAtualizado,
+            diasAtraso: encargos.diasAtraso,
+            calculadoEm: encargos.calculadoEm,
+          };
+          persist();
+          return { success: false, message: 'Checkout indisponível em modo de demonstração.' };
         });
       },
       create(payload) {
@@ -371,6 +450,17 @@ const DB = (() => {
           const idx = state.cobrancas.findIndex((c) => c.id === id);
           if (idx === -1) throw new Error('Cobrança não encontrada');
           const cob = state.cobrancas[idx];
+          // Trava (se ainda não tinha sido travado) o valor com multa/juros
+          // de hoje antes de registrar o pagamento — mesmo comportamento de
+          // register_manual_payment() no banco real: reconciliação manual de
+          // uma cobrança vencida registra o valor com encargos, não o original.
+          const encargos = calculateLateCharges(cob, state.empresa);
+          const valorPago = encargos.valorAtualizado;
+          cob.multaValor = encargos.multaValor;
+          cob.jurosValor = encargos.jurosValor;
+          cob.valorAtualizado = encargos.valorAtualizado;
+          cob.diasAtraso = encargos.diasAtraso;
+          cob.calculadoEm = encargos.calculadoEm;
           cob.status = 'pago';
           cob.pagoEm = new Date().toISOString();
           persist();
@@ -379,7 +469,7 @@ const DB = (() => {
             id: uid('pag'),
             cobrancaId: cob.id,
             clienteId: cob.clienteId,
-            valor: cob.valor,
+            valor: valorPago,
             forma,
             parcelas,
             dataHora: cob.pagoEm,
@@ -924,7 +1014,35 @@ const DB = (() => {
           pagoEm: row.paid_at,
           cliente: { nome: row.client_name },
           empresaNome: row.company_name,
+          // Multa/juros — sempre calculados no banco (get_public_charge_by_token
+          // -> calculate_late_charges), nunca no navegador.
+          diasAtraso: row.days_overdue || 0,
+          multaValor: Number(row.late_fee_amount || 0),
+          jurosValor: Number(row.late_interest_amount || 0),
+          valorAtualizado: row.updated_amount != null ? Number(row.updated_amount) : Number(row.amount),
+          calculadoEm: row.late_fee_calculated_at,
+          multaAtiva: Boolean(row.late_fee_enabled),
+          multaPercent: Number(row.late_fee_percent || 0),
+          jurosPercentMes: Number(row.late_interest_monthly_percent || 0),
         };
+      },
+      // Chama a Edge Function pública create-checkout-for-token — usada só
+      // quando a cobrança está vencida e o checkout já carregado pode estar
+      // com o valor antigo (sem multa/juros). Nunca envia o valor: o servidor
+      // recalcula e trava multa/juros antes de gerar o link novo.
+      async gerarCheckoutAtualizado(token) {
+        const { data, error } = await client.functions.invoke('create-checkout-for-token', {
+          body: { token },
+        });
+        if (error) {
+          let message = 'Não foi possível gerar o checkout atualizado.';
+          try {
+            const body = await error.context?.json?.();
+            if (body?.message) message = body.message;
+          } catch (_) { /* mantém mensagem genérica */ }
+          return { success: false, message };
+        }
+        return data;
       },
       async create(payload) {
         const companyId = await getCompanyId();
@@ -1122,6 +1240,9 @@ const DB = (() => {
           cidade: company.city || '',
           estado: company.state || '',
           cep: company.zip_code || '',
+          lateFeeEnabled: company.late_fee_enabled !== false,
+          lateFeePercent: Number(company.late_fee_percent ?? 2),
+          lateInterestMonthlyPercent: Number(company.late_interest_monthly_percent ?? 1),
           admin: {
             nome: profile.name,
             email: profile.email,
@@ -1139,6 +1260,11 @@ const DB = (() => {
         if (payload.cnpj !== undefined) companyPatch.document = payload.cnpj;
         if (payload.email !== undefined) companyPatch.email = payload.email;
         if (payload.telefone !== undefined) companyPatch.phone = payload.telefone;
+        if (payload.lateFeeEnabled !== undefined) companyPatch.late_fee_enabled = payload.lateFeeEnabled;
+        // Teto de 2% é reforçado no banco (CHECK constraint) — aqui só evita
+        // uma viagem ao servidor pra descobrir que vai ser rejeitado.
+        if (payload.lateFeePercent !== undefined) companyPatch.late_fee_percent = Math.min(Number(payload.lateFeePercent) || 0, 2);
+        if (payload.lateInterestMonthlyPercent !== undefined) companyPatch.late_interest_monthly_percent = Math.max(Number(payload.lateInterestMonthlyPercent) || 0, 0);
         if (Object.keys(companyPatch).length) {
           unwrap(await client.from('companies').update(companyPatch).eq('id', companyId));
         }

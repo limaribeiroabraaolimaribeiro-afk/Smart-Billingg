@@ -142,6 +142,123 @@ export async function callCreateLink(payload: CreateLinkPayload): Promise<Create
   return { ok: true, status: res.status, url: data?.url || null };
 }
 
+// ---------------------------------------------------------------------------
+// resolveChargeCheckoutUrl — regra ÚNICA de "quando reaproveitar vs. quando
+// gerar checkout novo", compartilhada por create-infinitepay-checkout (painel,
+// autenticado) e create-checkout-for-token (público). Nunca recebe amount do
+// chamador: sempre lê charges.amount/due_date + companies.late_fee_* do banco.
+//
+// Regra: enquanto a cobrança está dentro do prazo, comportamento idêntico ao
+// histórico (reaproveita checkout_url válido, senão cria com `amount`). A
+// partir do momento em que due_date passou, o checkout_url antigo NUNCA mais
+// é reaproveitado — cada chamada trava o cálculo de multa/juros do dia
+// (lock_late_charge_amount, no banco) e gera um link NOVO da InfinitePay com
+// `updated_amount`, substituindo o anterior. Isso evita o link antigo (valor
+// original) continuar circulando depois que a cobrança venceu.
+// ---------------------------------------------------------------------------
+// deno-lint-ignore no-explicit-any
+type AdminClient = any;
+
+export interface ChargeForCheckout {
+  id: string;
+  company_id: string;
+  client_id: string | null;
+  charge_number: string;
+  description: string;
+  amount: number;
+  due_date: string;
+  status: string;
+  checkout_url: string | null;
+}
+
+export interface ResolveCheckoutResult {
+  ok: boolean;
+  checkoutUrl: string | null;
+  message?: string;
+}
+
+export async function resolveChargeCheckoutUrl(
+  adminClient: AdminClient,
+  charge: ChargeForCheckout,
+  opts: { handle: string; redirectUrl: string; webhookUrl: string },
+): Promise<ResolveCheckoutResult> {
+  const isOverdue = charge.due_date < new Date().toISOString().slice(0, 10);
+
+  // Dentro do prazo: comportamento idêntico ao de sempre — reaproveita.
+  if (!isOverdue && isValidInfinitePayCheckoutUrl(charge.checkout_url)) {
+    return { ok: true, checkoutUrl: charge.checkout_url };
+  }
+
+  let amountToCharge = Number(charge.amount);
+
+  if (isOverdue) {
+    // Trava multa/juros de HOJE no banco antes de gerar o link — nunca a
+    // partir de um valor calculado aqui ou recebido do navegador.
+    const { data: locked, error: lockErr } = await adminClient.rpc('lock_late_charge_amount', {
+      p_charge_id: charge.id,
+    });
+    if (lockErr || !locked) {
+      return { ok: false, checkoutUrl: null, message: 'Não foi possível calcular multa/juros.' };
+    }
+    const row = Array.isArray(locked) ? locked[0] : locked;
+    amountToCharge = Number(row?.updated_amount ?? charge.amount);
+  }
+
+  let amountCents: number;
+  try {
+    amountCents = reaisToCents(amountToCharge);
+  } catch {
+    return { ok: false, checkoutUrl: null, message: 'Valor da cobrança inválido.' };
+  }
+
+  let client: { name?: string; email?: string; whatsapp?: string } | null = null;
+  if (charge.client_id) {
+    const { data: clientRow } = await adminClient
+      .from('clients')
+      .select('name, email, whatsapp')
+      .eq('id', charge.client_id)
+      .maybeSingle();
+    client = clientRow;
+  }
+
+  const customer: Record<string, string> = {};
+  if (client?.name) customer.name = client.name;
+  if (client?.email) customer.email = client.email;
+  const phone = normalizePhoneBR(client?.whatsapp);
+  if (phone) customer.phone_number = phone;
+
+  const linkPayload: CreateLinkPayload = {
+    handle: opts.handle,
+    redirect_url: opts.redirectUrl,
+    webhook_url: opts.webhookUrl,
+    order_nsu: charge.charge_number,
+    ...(Object.keys(customer).length ? { customer } : {}),
+    items: [{ quantity: 1, price: amountCents, description: charge.description }],
+  };
+
+  let result: CreateLinkResult;
+  try {
+    result = await callCreateLink(linkPayload);
+  } catch {
+    return { ok: false, checkoutUrl: null, message: 'Não foi possível conectar à InfinitePay.' };
+  }
+
+  if (!result.ok || !isValidInfinitePayCheckoutUrl(result.url)) {
+    return { ok: false, checkoutUrl: null, message: 'A InfinitePay não retornou um checkout válido.' };
+  }
+
+  const { error: updateErr } = await adminClient
+    .from('charges')
+    .update({ provider: 'infinitepay', provider_reference: charge.charge_number, checkout_url: result.url })
+    .eq('id', charge.id);
+
+  if (updateErr) {
+    return { ok: false, checkoutUrl: null, message: 'Checkout criado, mas não foi possível salvar. Tente novamente.' };
+  }
+
+  return { ok: true, checkoutUrl: result.url };
+}
+
 export interface PaymentCheckPayload {
   handle: string;
   order_nsu: string;

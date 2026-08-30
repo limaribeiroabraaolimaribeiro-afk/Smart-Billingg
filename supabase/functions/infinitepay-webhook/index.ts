@@ -108,7 +108,7 @@ Deno.serve(async (req: Request) => {
   // ---- 2. Localizar a cobrança pelo order_nsu ----
   const { data: charge } = await adminClient
     .from('charges')
-    .select('id, company_id, amount, status, provider, charge_number')
+    .select('id, company_id, amount, updated_amount, status, provider, charge_number')
     .eq('charge_number', payload.order_nsu)
     .maybeSingle();
 
@@ -145,11 +145,14 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ success: false, message: 'Pagamento não confirmado.' }, 400);
   }
 
-  // ---- 4. Comparar valor confirmado com o valor da cobrança ----
+  // ---- 4. Comparar valor confirmado com o valor esperado da cobrança ----
+  // updated_amount (quando existir) é o valor com multa/juros travado na
+  // última vez que um checkout foi gerado pra esta cobrança vencida — nunca
+  // amount puro nesse caso, senão o pagamento com encargos seria rejeitado.
   const confirmedAmountCents = check.amount ?? payload.amount;
   let expectedCents: number;
   try {
-    expectedCents = reaisToCents(Number(charge.amount));
+    expectedCents = reaisToCents(Number(charge.updated_amount ?? charge.amount));
   } catch {
     await markError('Valor da cobrança inválido no banco.');
     return jsonResponse({ success: false, message: 'Cobrança com valor inválido.' }, 400);

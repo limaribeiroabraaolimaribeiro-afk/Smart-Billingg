@@ -22,6 +22,12 @@ verify_jwt = false
 [functions.select-plan-offer]
 verify_jwt = false
 
+# Página pública cobranca-publica.html (sem login), só usada quando a
+# cobrança está vencida — a "autenticação" é o public_token secreto e
+# imprevisível da própria cobrança.
+[functions.create-checkout-for-token]
+verify_jwt = false
+
 [functions.send-receipt-email]
 verify_jwt = true
 
