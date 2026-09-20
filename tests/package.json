@@ -1,0 +1,11 @@
+{
+  "name": "smart-billing-access-validation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test system-access-http.test.mjs system-access-demo.test.mjs && node system-access-db.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  }
+}
