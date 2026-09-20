@@ -7,6 +7,7 @@ const SB_NAV = [
   { key: 'cobrancas', label: 'Cobranças', href: 'cobrancas.html', icon: SB_ICON.invoice },
   { key: 'clientes', label: 'Clientes', href: 'clientes.html', icon: SB_ICON.users },
   { key: 'planos', label: 'Planos', href: 'planos.html', icon: SB_ICON.package },
+  { key: 'sistemas', label: 'Sistemas', href: 'sistemas.html', icon: SB_ICON.settings },
   { key: 'pagamentos', label: 'Pagamentos', href: 'pagamentos.html', icon: SB_ICON.card },
   { key: 'recibos', label: 'Recibos', href: 'recibos.html', icon: SB_ICON.receipt },
   { key: 'relatorios', label: 'Relatórios', href: 'relatorios.html', icon: SB_ICON.chart },

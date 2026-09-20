@@ -329,6 +329,7 @@ const DB = (() => {
           // ligados a essas cobranças — nada fica órfão como "Cliente removido".
           const cobrancaIds = new Set(state.cobrancas.filter((c) => c.clienteId === id).map((c) => c.id));
           state.clientes = state.clientes.filter((c) => c.id !== id);
+          state.sistemas = (state.sistemas || []).filter((s) => s.clienteId !== id);
           state.cobrancas = state.cobrancas.filter((c) => c.clienteId !== id);
           state.pagamentos = state.pagamentos.filter((p) => !cobrancaIds.has(p.cobrancaId));
           state.recibos = state.recibos.filter((r) => !cobrancaIds.has(r.cobrancaId));
@@ -784,7 +785,39 @@ const DB = (() => {
       },
     };
 
-    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa, whatsapp, planos, ofertas, assinaturas };
+    // Demo usa snapshots ilustrativos; nunca calcula inadimplência no navegador.
+    if (!Array.isArray(state.sistemas)) { state.sistemas = []; persist(); }
+    function demoSystem(s) {
+      return { ...s, clienteNome: state.clientes.find(c => c.id === s.clienteId)?.nome || '',
+        assinaturaNome: state.planos.find(p => p.id === state.assinaturas.find(a => a.id === s.assinaturaId)?.planoId)?.nome || '',
+        acesso: { status: s.demoStatus || 'active', allowed: s.demoStatus !== 'suspended' } };
+    }
+    const sistemas = {
+      async podeGerenciar() { return true; },
+      async listar(clienteId) { return state.sistemas.filter(s => !clienteId || s.clienteId === clienteId).map(demoSystem); },
+      async obter(id) { const s = state.sistemas.find(s => s.id === id); return s ? demoSystem(s) : null; },
+      async criar(payload) {
+        if (!state.clientes.some(c => c.id === payload.clienteId)) throw new Error('Cliente inválido');
+        if (payload.assinaturaId && !state.assinaturas.some(a => a.id === payload.assinaturaId && a.clienteId === payload.clienteId)) throw new Error('Assinatura inválida');
+        const s = { ...payload, id: crypto.randomUUID(), chave: crypto.randomUUID(),
+          manualOverride: 'none', ativo: payload.ativo ?? true, demoStatus: payload.ativo === false ? 'suspended' : 'active' };
+        state.sistemas.push(s); persist(); return demoSystem(s);
+      },
+      async atualizar(id, payload) {
+        const s = state.sistemas.find(s => s.id === id);
+        if (!s) throw new Error('Sistema não encontrado');
+        if (payload.assinaturaId && !state.assinaturas.some(a => a.id === payload.assinaturaId && a.clienteId === s.clienteId)) throw new Error('Assinatura inválida');
+        for (const field of ['nome', 'dominio', 'assinaturaId', 'bloqueioAutomatico', 'diasCarencia', 'manualOverride', 'ativo']) {
+          if (Object.hasOwn(payload, field)) s[field] = payload[field];
+        }
+        s.demoStatus = !s.ativo || s.manualOverride === 'force_suspended' ? 'suspended' : 'active';
+        persist(); return demoSystem(s);
+      },
+      async suspender(id) { return this.atualizar(id, { manualOverride: 'force_suspended' }); },
+      async liberar(id) { return this.atualizar(id, { manualOverride: 'force_active' }); },
+      async voltarAutomatico(id) { return this.atualizar(id, { manualOverride: 'none' }); },
+    };
+    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa, whatsapp, planos, ofertas, assinaturas, sistemas };
   }
 
   // ==========================================================================
@@ -1629,7 +1662,47 @@ const DB = (() => {
       },
     };
 
-    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa, whatsapp, planos, ofertas, assinaturas };
+    function mapSistema(s) {
+      return { id: s.id, clienteId: s.client_id, clienteNome: s.clients?.name || '',
+        assinaturaId: s.subscription_id, assinaturaNome: s.client_subscriptions?.billing_plans?.name || '',
+        nome: s.name, dominio: s.domain || '', chave: s.system_key,
+        bloqueioAutomatico: s.auto_block_enabled, diasCarencia: s.grace_days,
+        manualOverride: s.manual_override, ativo: s.active };
+    }
+    function systemPayload(p) {
+      const fields = { nome: 'name', dominio: 'domain', assinaturaId: 'subscription_id',
+        bloqueioAutomatico: 'auto_block_enabled', diasCarencia: 'grace_days', manualOverride: 'manual_override', ativo: 'active' };
+      return Object.fromEntries(Object.entries(fields).filter(([k]) => Object.hasOwn(p, k)).map(([k, v]) => [v, p[k]]));
+    }
+    const sistemas = {
+      async podeGerenciar() {
+        return Boolean(unwrap(await client.rpc('has_company_role', { target_company_id: await getCompanyId(), allowed_roles: ['owner', 'admin', 'employee'] })));
+      },
+      async listar(clienteId = null) {
+        const companyId = await getCompanyId();
+        let query = client.from('client_systems').select('*, clients!systems_client_fk(name), client_subscriptions!systems_subscription_fk(billing_plans(name))').eq('company_id', companyId).order('created_at', { ascending: false });
+        if (clienteId) query = query.eq('client_id', clienteId);
+        const rows = unwrap(await query);
+        const states = unwrap(await client.rpc('list_system_access', { p_company_id: companyId, p_client_id: clienteId }));
+        const access = new Map(states.map(s => [s.system_id, s.access]));
+        return rows.map(s => ({ ...mapSistema(s), acesso: access.get(s.id) || null }));
+      },
+      async obter(id) { return (await this.listar()).find(s => s.id === id) || null; },
+      async criar(payload) {
+        const row = unwrap(await client.from('client_systems').insert({ ...systemPayload(payload),
+          company_id: await getCompanyId(), client_id: payload.clienteId }).select().single());
+        return mapSistema(row);
+      },
+      async atualizar(id, payload) {
+        const row = unwrap(await client.from('client_systems').update(systemPayload(payload))
+          .eq('company_id', await getCompanyId()).eq('id', id).select().single());
+        return mapSistema(row);
+      },
+      async suspender(id) { return this.atualizar(id, { manualOverride: 'force_suspended' }); },
+      async liberar(id) { return this.atualizar(id, { manualOverride: 'force_active' }); },
+      async voltarAutomatico(id) { return this.atualizar(id, { manualOverride: 'none' }); },
+    };
+    return { clientes, cobrancas, pagamentos, recibos, dashboard, empresa, whatsapp, planos, ofertas, assinaturas, sistemas };
   }
 
   const backend = useDemo ? buildDemoBackend() : buildSupabaseBackend();

@@ -33,6 +33,16 @@
   let cobrancasCliente = [];
   let cliente = null;
 
+  // Falha neste módulo não impede o histórico financeiro de carregar.
+  DB.sistemas.listar(clienteId).then(systems => {
+    const labels = { active: 'Ativo', grace: 'Em carência', suspended: 'Suspenso' };
+    document.getElementById('client-systems-region').innerHTML =
+      (systems.length ? systems.map(s => `<p><strong>${SB_UI.escapeHtml(s.nome)}</strong> · ${labels[s.acesso?.status] || 'Status indisponível'}${!s.bloqueioAutomatico ? ' · Bloqueio automático desligado' : ''}</p>`).join('') : '<p>Nenhum sistema vinculado.</p>') +
+      `<a class="btn btn-secondary btn-sm" href="sistemas.html?cliente=${encodeURIComponent(clienteId)}">Ver sistemas do cliente</a>`;
+  }).catch(() => {
+    document.getElementById('client-systems-region').textContent = 'Não foi possível consultar os sistemas. Tente novamente na área Sistemas.';
+  });
+
   try {
     let stats;
     [cliente, stats] = await Promise.all([DB.clientes.get(clienteId), DB.clientes.stats(clienteId)]);

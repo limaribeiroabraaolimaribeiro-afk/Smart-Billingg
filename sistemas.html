@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Sistemas · Smart Billing</title>
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/variables.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/layout.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+<link rel="stylesheet" href="assets/css/pages.css" />
+</head>
+<body>
+<div id="page-content">
+  <div class="page-section">
+    <div class="section-head">
+      <div><h2 class="section-head__title">Sistemas</h2>
+        <p class="section-head__desc">Acompanhe o acesso aos sistemas e suas assinaturas vinculadas.</p></div>
+      <button id="new-system" class="btn btn-primary" hidden>Novo sistema</button>
+    </div>
+    <p id="demo-note" hidden>Modo demonstração: estados ilustrativos, sem cálculo de inadimplência.</p>
+    <form id="system-form" class="card card-pad" hidden style="margin-bottom:24px;">
+      <h3 id="form-title">Novo sistema</h3>
+      <div class="field-row">
+        <div class="field"><label for="system-client">Cliente</label><select id="system-client" class="input" required></select></div>
+        <div class="field"><label for="system-name">Nome do sistema</label><input id="system-name" class="input" required maxlength="160" /></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="system-domain">Domínio (opcional)</label><input id="system-domain" class="input" maxlength="253" placeholder="exemplo.com.br" /></div>
+        <div class="field"><label for="system-subscription">Assinatura</label><select id="system-subscription" class="input"></select></div>
+      </div>
+      <p>Sem assinatura vinculada, o sistema fica liberado automaticamente. Cobranças avulsas não afetam o acesso.</p>
+      <div class="field"><label for="system-grace">Dias de carência</label><input id="system-grace" class="input" type="number" min="0" max="365" step="1" value="3" required /></div>
+      <div class="field"><label><input id="system-auto" type="checkbox" checked /> Bloqueio automático</label></div>
+      <div class="field"><label><input id="system-active" type="checkbox" checked /> Sistema administrativamente ativo</label></div>
+      <p id="form-error" role="alert"></p>
+      <button id="save-system" class="btn btn-primary" type="submit">Salvar sistema</button>
+      <button id="cancel-system" class="btn btn-secondary" type="button">Cancelar</button>
+    </form>
+    <div class="field"><label for="filter-client">Filtrar por cliente</label><select id="filter-client" class="input"></select></div>
+    <div id="systems-region" aria-live="polite"><div class="skeleton skeleton-row"></div></div>
+  </div>
+</div>
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/supabase-client.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/layout.js"></script>
+<script src="assets/js/sistemas.js"></script>
+</body>
+</html>
