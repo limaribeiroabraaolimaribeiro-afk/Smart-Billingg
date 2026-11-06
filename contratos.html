@@ -75,6 +75,7 @@
   const session=await SB_AUTH.requireSession();if(!session)return;
   await SBLayout.mount({active:"contratos",title:"Contratos",hidePrimaryAction:true});
   const $=id=>document.getElementById(id),canvas=$("ct-canvas"),ctx=canvas.getContext("2d");
+  const signingLink=token=>{const url=new URL("assinar-contrato.html",window.location.href);url.searchParams.set("token",token);return url.href;};
   let drawn=false,down=false,last=null,createdLink="";
   ctx.strokeStyle="#111827";ctx.lineWidth=3.6;ctx.lineCap="round";ctx.lineJoin="round";
   function pos(e){const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}
@@ -106,7 +107,7 @@
           const btn=document.createElement("button");btn.className="btn btn-secondary btn-sm";btn.textContent="Gerar link";
           btn.title="Gera um novo link e invalida o anterior";
           btn.onclick=async()=>{if(!confirm("Gerar um novo link? O link anterior deixará de funcionar."))return;
-            try{btn.disabled=true;const r=await call("refresh",{id:c.id});createdLink=r.url;
+            try{btn.disabled=true;const r=await call("refresh",{id:c.id});createdLink=signingLink(r.token);
               $("ct-result").hidden=false;$("ct-url").textContent=createdLink;
               $("ct-result").scrollIntoView({behavior:"smooth",block:"nearest"});
             }catch(e){alert(e.message)}finally{btn.disabled=false}};
@@ -133,7 +134,7 @@
         product_description:v("product"),product_serial:v("serial"),product_condition:v("condition"),
         accessories:v("accessories"),signature_png:canvas.toDataURL("image/png")
       });
-      createdLink=result.url;$("ct-result").hidden=false;$("ct-url").textContent=createdLink;
+      createdLink=signingLink(result.token);$("ct-result").hidden=false;$("ct-url").textContent=createdLink;
       $("ct-result").scrollIntoView({behavior:"smooth",block:"nearest"});await list();
     }catch(err){$("ct-error").textContent=err.message}
     finally{btn.disabled=false;btn.textContent="Gerar link para a compradora"}
