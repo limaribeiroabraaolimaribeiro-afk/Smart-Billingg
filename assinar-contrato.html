@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
+<meta name="referrer" content="no-referrer">
+<title>Assinar contrato · Smart Billing</title>
+<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/variables.css"><link rel="stylesheet" href="assets/css/base.css">
+<style>
+*{box-sizing:border-box}body{background:#f3f5fb;color:#18223b;font-family:Inter,system-ui,Arial,sans-serif;margin:0}
+.sc-wrap{max-width:680px;margin:22px auto 70px;padding:0 12px}.sc-card{background:#fff;border:1px solid #e2e6f0;border-radius:18px;box-shadow:0 9px 28px #15204a12;padding:25px;margin-bottom:15px}
+.sc-top{text-align:center;background:linear-gradient(125deg,#101c42,#283876);color:#fff;padding:28px 22px}
+.sc-top h1{font-size:24px;margin:0 0 6px}.sc-top p{margin:0;color:#d5defb;font-size:13px}
+.sc-amount{display:flex;gap:15px;flex-wrap:wrap;margin:14px 0}
+.sc-amount div{flex:1;background:#f4f6ff;padding:16px;border-radius:12px;min-width:130px}
+.sc-amount small{display:block;color:#5e6881;font-size:12px;margin-bottom:5px}.sc-amount strong{font-size:22px;color:#234db4}
+h2{font-size:18px;margin:0 0 14px}p{line-height:1.6;font-size:14px}.sc-list{margin:0;padding:0;list-style:none}
+.sc-list li{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid #edf0f6;gap:12px;font-size:13px}
+.sc-list span{color:#626e82}.sc-list strong{text-align:right;word-break:break-word}
+.sc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sc-field{display:flex;flex-direction:column;gap:6px;margin-bottom:15px}.sc-field label{font-size:12px;font-weight:700}
+.sc-field input,.sc-field textarea{border:1px solid #ccd3e3;border-radius:10px;width:100%;padding:13px;font-size:15px;color:#18223b;background:#fff}
+.sc-field input:focus,.sc-field textarea:focus{outline:2px solid #bfdbfe;border-color:#3b82f6}
+.sc-field textarea{min-height:83px;resize:vertical}.sc-info{background:#f0f6ff;padding:14px;border-radius:11px;font-size:13px;line-height:1.6}
+.sc-sign{border:2px dashed #b6c3dc;background:#fff;border-radius:12px;overflow:hidden}
+.sc-sign canvas{width:100%;height:155px;display:block;touch-action:none;cursor:crosshair}
+.sc-btn{border:0;border-radius:10px;background:linear-gradient(90deg,#2563eb,#6d28d9);color:#fff;padding:14px 18px;font-weight:700;font-size:14px;cursor:pointer}
+.sc-btn:disabled{opacity:.5;cursor:not-allowed}.sc-clear{border:1px solid #d6daeb;background:#fff;color:#334155;border-radius:9px;padding:9px 13px;margin-top:8px;cursor:pointer}
+.sc-check{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.65;margin:20px 0}.sc-check input{margin-top:4px;min-width:17px;height:17px}
+.sc-warning{color:#b91c1c;font-size:13px;margin:12px 0}.sc-done{background:#edfcf4;color:#065f46;padding:17px;border-radius:12px;line-height:1.6}
+.sc-muted{color:#77839a;font-size:12px}
+@media(max-width:600px){.sc-card{padding:17px}.sc-grid{grid-template-columns:1fr}.sc-wrap{margin:0 auto 35px;padding:0 0 18px}.sc-top{border-radius:0 0 18px 18px}.sc-content{padding:0 12px}}
+</style>
+</head>
+<body>
+<div class="sc-wrap">
+<header class="sc-top sc-card"><h1>Contrato de compra e venda</h1><p>Smart Billing · Assinatura eletrônica</p></header>
+<div class="sc-content">
+<section class="sc-card" id="sc-loading">Carregando as condições do contrato…</section>
+<section class="sc-card" id="sc-details" hidden>
+<h2>Confira o acordo antes de assinar</h2>
+<p>Você está prestes a aceitar a compra de um notebook usado, nas condições e datas abaixo.</p>
+<div class="sc-amount"><div><small>Valor total</small><strong>R$ 1.850,00</strong></div><div><small>Pagamento</small><strong>10x R$ 185,00</strong></div></div>
+<ul class="sc-list">
+<li><span>Vendedor</span><strong id="sc-seller"></strong></li>
+<li><span>Endereço do vendedor</span><strong id="sc-seller-address"></strong></li>
+<li><span>Notebook</span><strong id="sc-product"></strong></li>
+<li><span>Número de série</span><strong id="sc-serial"></strong></li>
+<li><span>Conservação / defeitos</span><strong id="sc-condition"></strong></li>
+<li><span>Acessórios</span><strong id="sc-accessories"></strong></li>
+<li><span>Chave Pix para pagamento</span><strong id="sc-pix"></strong></li>
+</ul>
+<h2 style="margin-top:22px">Vencimentos dos 10 meses</h2>
+<ul class="sc-list" id="sc-dates"></ul>
+<div class="sc-info" style="margin-top:17px">Ao assinar, você se compromete a pagar as 10 parcelas via Pix nas datas indicadas. Em caso de atraso, o vendedor poderá cobrar os valores vencidos pelos meios legais. Guarde os comprovantes. A entrega do notebook deverá ser confirmada separadamente.</div>
+</section>
+<section class="sc-card" id="sc-form-card" hidden>
+<h2>Seus dados e assinatura</h2>
+<p class="sc-muted">Seus dados serão usados para formalizar este contrato e guardar a prova do acordo. O PDF final não ficará público.</p>
+<form id="sc-form">
+<div class="sc-field"><label for="sc-name">Nome completo</label><input id="sc-name" maxlength="120" autocomplete="name" required></div>
+<div class="sc-grid">
+<div class="sc-field"><label for="sc-cpf">CPF</label><input id="sc-cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" required></div>
+<div class="sc-field"><label for="sc-phone">WhatsApp</label><input id="sc-phone" inputmode="tel" maxlength="40" autocomplete="tel" placeholder="(47) 99999-9999"></div>
+</div>
+<div class="sc-field"><label for="sc-email">Seu e-mail para receber o contrato</label><input id="sc-email" type="email" maxlength="180" autocomplete="email" required></div>
+<div class="sc-field"><label for="sc-address">Seu endereço completo</label><textarea id="sc-address" maxlength="250" autocomplete="street-address" required placeholder="Rua, número, bairro, cidade, estado e CEP"></textarea></div>
+<label style="font-size:13px;font-weight:700;display:block;margin-bottom:8px">Assine com o dedo ou mouse</label>
+<div class="sc-sign"><canvas id="sc-canvas" width="880" height="310" aria-label="Área para desenhar sua assinatura"></canvas></div>
+<button type="button" id="sc-clear" class="sc-clear">Limpar assinatura</button>
+<label class="sc-check"><input id="sc-accept" type="checkbox" required> <span>Li e concordo com a compra do notebook usado pelo valor total de R$ 1.850,00 em 10 parcelas mensais de R$ 185,00 via Pix e aceito utilizar assinatura eletrônica. Estou ciente do tratamento dos meus dados para este contrato.</span></label>
+<p class="sc-muted">Esta é uma assinatura eletrônica simples. A plataforma registra data, hora e informações técnicas, mas não valida sua identidade por biometria ou certificado digital.</p>
+<button id="sc-send" class="sc-btn" type="submit" style="width:100%">Concordar e assinar contrato</button>
+<p id="sc-error" class="sc-warning" role="alert"></p>
+</form>
+</section>
+<section class="sc-card" id="sc-complete" hidden>
+<div class="sc-done"><h2>Contrato assinado com sucesso!</h2><p>Sua cópia em PDF está pronta. Salve o arquivo junto com os comprovantes de cada Pix.</p></div>
+<button class="sc-btn" id="sc-download" style="margin-top:15px" type="button">Baixar contrato assinado em PDF</button>
+<p class="sc-muted" id="sc-email-status"></p>
+</section>
+</div></div>
+<script>
+(async function(){
+ const $=id=>document.getElementById(id),token=new URLSearchParams(location.search).get("token")||"";
+ const config={url:"https://uhdmjgycsyvetrjhwcpy.supabase.co/functions/v1/sale-contracts",
+   anonKey:"sb_publishable_Ag-AwAqJWfaB7wykzwHQLQ_z4uZxwfT"};
+ async function api(action,payload={}){
+   const res=await fetch(config.url,{method:"POST",headers:{"Content-Type":"application/json","apikey":config.anonKey},
+     body:JSON.stringify({action,token,...payload})});
+   const json=await res.json();if(!res.ok)throw new Error(json.error||"Falha na comunicação");return json;
+ }
+ let urlForDownload="",drawn=false,down=false,last=null;
+ const canvas=$("sc-canvas"),ctx=canvas.getContext("2d");ctx.strokeStyle="#101827";ctx.fillStyle="#101827";ctx.lineWidth=4;ctx.lineJoin="round";ctx.lineCap="round";
+ const pos=e=>{const rect=canvas.getBoundingClientRect();return {x:(e.clientX-rect.left)*canvas.width/rect.width,y:(e.clientY-rect.top)*canvas.height/rect.height}};
+ canvas.addEventListener("pointerdown",e=>{down=true;drawn=true;last=pos(e);canvas.setPointerCapture(e.pointerId);ctx.beginPath();ctx.arc(last.x,last.y,2,0,Math.PI*2);ctx.fill()});
+ canvas.addEventListener("pointermove",e=>{if(!down)return;const next=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(next.x,next.y);ctx.stroke();last=next});
+ ["pointerup","pointercancel"].forEach(name=>canvas.addEventListener(name,()=>{down=false;last=null}));
+ $("sc-clear").onclick=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);drawn=false};
+ $("sc-download").onclick=async()=>{
+   const btn=$("sc-download");btn.disabled=true;
+   try{if(!urlForDownload){const r=await api("download");urlForDownload=r.url;}location.href=urlForDownload}
+   catch(e){alert("Não foi possível baixar o PDF: "+e.message)}
+   finally{btn.disabled=false}
+ };
+ try{
+   if(!token)throw new Error("Este link não contém o token do contrato");
+   const {contract:c}=await api("get");
+   $("sc-loading").hidden=true;
+   if(c.status==="signed"){$("sc-complete").hidden=false;return}
+   if(c.status!=="pending")throw new Error("Assinatura em processamento, tente novamente em instantes");
+   const fields={seller:"seller_name","seller-address":"seller_address",product:"product_description",serial:"product_serial",
+     condition:"product_condition",accessories:"accessories",pix:"pix_key"};
+   for(const [id,key] of Object.entries(fields))$("sc-"+id).textContent=c[key]||"—";
+   for(let i=0;i<c.installments.length;i++){
+     const li=document.createElement("li"),left=document.createElement("span"),right=document.createElement("strong");
+     const date=c.installments[i].split("-").reverse().join("/");
+     left.textContent="Parcela "+(i+1);right.textContent=date+" · R$ 185,00";li.append(left,right);$("sc-dates").append(li);
+   }
+   $("sc-details").hidden=false;$("sc-form-card").hidden=false;
+ }catch(e){$("sc-loading").textContent=e.message}
+ $("sc-form").addEventListener("submit",async e=>{
+   e.preventDefault();$("sc-error").textContent="";
+   if(!drawn){$("sc-error").textContent="Desenhe sua assinatura no quadro";return}
+   const btn=$("sc-send");btn.disabled=true;btn.textContent="Salvando assinatura…";
+   try{
+     const v=id=>$(id).value.trim();
+     const result=await api("sign",{name:v("sc-name"),cpf:v("sc-cpf"),phone:v("sc-phone"),
+       email:v("sc-email"),address:v("sc-address"),signature_png:canvas.toDataURL("image/png"),accepted:$("sc-accept").checked});
+     urlForDownload=result.url;$("sc-details").hidden=true;$("sc-form-card").hidden=true;$("sc-complete").hidden=false;
+     const sent=result.email_buyer_status==="enviado";
+     $("sc-email-status").textContent=sent?"O contrato também foi enviado para seu e-mail.":"O envio por e-mail não foi confirmado. Baixe o PDF pelo botão acima e guarde uma cópia.";
+     window.scrollTo({top:0,behavior:"smooth"});
+   }catch(err){$("sc-error").textContent=err.message}
+   finally{btn.disabled=false;btn.textContent="Concordar e assinar contrato"}
+ });
+})();
+</script></body></html>
