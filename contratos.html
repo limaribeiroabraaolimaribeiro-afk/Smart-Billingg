@@ -102,6 +102,16 @@
         left.append(title,small);
         const right=document.createElement("div");right.className="ct-actions";
         const status=document.createElement("span");status.className="ct-status "+(c.status==="signed"?"signed":"");status.textContent=c.status==="signed"?"Assinado":"Pendente";right.append(status);
+        if(c.status==="pending"){
+          const btn=document.createElement("button");btn.className="btn btn-secondary btn-sm";btn.textContent="Gerar link";
+          btn.title="Gera um novo link e invalida o anterior";
+          btn.onclick=async()=>{if(!confirm("Gerar um novo link? O link anterior deixará de funcionar."))return;
+            try{btn.disabled=true;const r=await call("refresh",{id:c.id});createdLink=r.url;
+              $("ct-result").hidden=false;$("ct-url").textContent=createdLink;
+              $("ct-result").scrollIntoView({behavior:"smooth",block:"nearest"});
+            }catch(e){alert(e.message)}finally{btn.disabled=false}};
+          right.append(btn);
+        }
         if(c.status==="signed"){
           const btn=document.createElement("button");btn.className="btn btn-secondary btn-sm";btn.textContent="Baixar PDF";
           btn.onclick=async()=>{try{btn.disabled=true;const r=await call("download",{id:c.id});window.open(r.url,"_blank","noopener,noreferrer")}catch(e){alert(e.message)}finally{btn.disabled=false}};
