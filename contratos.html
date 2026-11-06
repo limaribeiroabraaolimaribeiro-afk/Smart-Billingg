@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Contratos · Smart Billing</title>
+<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/variables.css"><link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/layout.css"><link rel="stylesheet" href="assets/css/components.css">
+<link rel="stylesheet" href="assets/css/pages.css">
+<style>
+.ct-wrap{max-width:1000px;margin:auto}.ct-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.ct-card{background:white;border:1px solid var(--border-subtle);border-radius:16px;padding:24px;margin-bottom:20px;box-shadow:var(--shadow-sm)}
+.ct-card h2{font-size:18px;margin:0 0 8px;color:var(--text-primary)}
+.ct-desc{font-size:13px;color:var(--text-secondary);line-height:1.6;margin:0 0 20px}
+.ct-field{display:flex;flex-direction:column;gap:6px;margin-bottom:15px}
+.ct-field label{font-size:12px;font-weight:700;color:var(--text-primary)}
+.ct-field input,.ct-field textarea{width:100%;padding:12px;border:1px solid var(--border-strong);border-radius:9px;font-size:14px;color:var(--text-primary);background:#fff}
+.ct-field textarea{min-height:76px;resize:vertical}.ct-field input:focus,.ct-field textarea:focus{outline:2px solid #dbeafe;border-color:#2563eb}
+.ct-money{display:flex;gap:16px;flex-wrap:wrap;background:#f5f7ff;padding:18px;border-radius:12px;margin:12px 0 22px}
+.ct-money div{flex:1;min-width:130px}.ct-money strong{display:block;font-size:22px;color:#1d4ed8}.ct-money small{color:#6b7280}
+.ct-sign{border:2px dashed #c9d1e6;border-radius:12px;background:#fff;overflow:hidden;max-width:440px}
+.ct-sign canvas{width:100%;height:150px;touch-action:none;display:block;cursor:crosshair}
+.ct-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ct-help{font-size:12px;color:#69748a;margin:9px 0}.ct-result{padding:15px;border-radius:12px;background:#ecfdf5;color:#065f46;margin:16px 0;word-break:break-all}
+.ct-status{font-size:12px;font-weight:700;padding:4px 9px;border-radius:30px;background:#e7f0ff;color:#1e40af}
+.ct-status.signed{background:#d1fae5;color:#065f46}
+.ct-item{border-top:1px solid #e8eaf1;padding:14px 0;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.ct-item-title{font-weight:700;font-size:14px}.ct-item small{color:#667085}
+#ct-error{color:#b91c1c;font-size:13px;margin:10px 0}
+@media(max-width:650px){.ct-grid{grid-template-columns:1fr}.ct-card{padding:16px}}
+</style>
+</head>
+<body>
+<div id="page-content"><div class="ct-wrap">
+<section class="ct-card">
+<h2>Novo contrato de venda</h2>
+<p class="ct-desc">Prepare o contrato do notebook, assine como vendedor e envie o link para a compradora assinar no celular. Os dados ficam privados no Supabase.</p>
+<div class="ct-money"><div><small>Valor da venda</small><strong>R$ 1.850,00</strong></div><div><small>10 parcelas via Pix</small><strong>R$ 185,00</strong></div></div>
+<form id="ct-form">
+<h3 style="font-size:14px;margin:0 0 16px">Seus dados como vendedor</h3>
+<div class="ct-grid">
+<div class="ct-field"><label for="seller-name">Nome completo</label><input id="seller-name" required maxlength="120" autocomplete="name" value="Abraão Lima Ribeiro"></div>
+<div class="ct-field"><label for="seller-cpf">CPF</label><input id="seller-cpf" required inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></div>
+</div>
+<div class="ct-field"><label for="seller-address">Endereço completo</label><input id="seller-address" required maxlength="250" autocomplete="street-address" placeholder="Rua, número, bairro, cidade e CEP"></div>
+<div class="ct-grid">
+<div class="ct-field"><label for="pix-key">Chave Pix para receber as parcelas</label><input id="pix-key" required maxlength="120"></div>
+<div class="ct-field"><label for="first-date">Vencimento da primeira parcela</label><input id="first-date" type="date" required></div>
+</div>
+<h3 style="font-size:14px;margin:10px 0 16px">Identificação do notebook</h3>
+<div class="ct-grid">
+<div class="ct-field"><label for="product">Modelo e configuração</label><input id="product" required value="Notebook ASUS Core i3 usado" maxlength="180"></div>
+<div class="ct-field"><label for="serial">Número de série</label><input id="serial" required maxlength="100" placeholder="Localizado na etiqueta ou BIOS"></div>
+</div>
+<div class="ct-field"><label for="condition">Estado de conservação e defeitos conhecidos</label><textarea id="condition" required maxlength="300" placeholder="Descreva bateria, tela, carregador, marcas de uso e possíveis defeitos"></textarea></div>
+<div class="ct-field"><label for="accessories">Acessórios que serão entregues</label><input id="accessories" maxlength="200" value="Carregador"></div>
+<label style="font-size:13px;font-weight:700;display:block;margin-bottom:8px">Assine como vendedor</label>
+<div class="ct-sign"><canvas id="ct-canvas" width="880" height="300" aria-label="Área de assinatura do vendedor"></canvas></div>
+<div class="ct-actions" style="margin-top:8px"><button class="btn btn-secondary btn-sm" id="ct-clear" type="button">Limpar assinatura</button><span class="ct-help">Desenhe usando o dedo ou o mouse</span></div>
+<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:20px 0"><input type="checkbox" id="ct-agree" required style="margin-top:2px"> Concordo com os dados e valores informados e autorizo a geração de um contrato eletrônico de compra e venda</label>
+<button class="btn btn-primary" id="ct-submit" type="submit">Gerar link para a compradora</button>
+<div id="ct-error" role="alert"></div>
+</form>
+<div id="ct-result" hidden class="ct-result"><strong>Contrato criado!</strong><p>Copie e envie o link pelo WhatsApp:</p><p id="ct-url"></p><button class="btn btn-secondary btn-sm" id="ct-copy" type="button">Copiar link</button></div>
+</section>
+<section class="ct-card"><h2>Contratos criados</h2><p class="ct-desc">A cópia assinada fica no armazenamento privado e pode ser baixada aqui.</p><div id="ct-list">Carregando contratos…</div></section>
+</div></div>
+<script src="assets/js/icons.js"></script><script src="assets/js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/supabase-client.js"></script><script src="assets/js/data.js"></script><script src="assets/js/ui.js"></script>
+<script src="assets/js/auth.js"></script><script src="assets/js/notifications.js"></script>
+<script src="assets/js/layout.js"></script>
+<script>
+(async function(){
+  const session=await SB_AUTH.requireSession();if(!session)return;
+  await SBLayout.mount({active:"contratos",title:"Contratos",hidePrimaryAction:true});
+  const $=id=>document.getElementById(id),canvas=$("ct-canvas"),ctx=canvas.getContext("2d");
+  const signingLink=token=>{const url=new URL("assinar-contrato.html",window.location.href);url.searchParams.set("token",token);return url.href;};
+  let drawn=false,down=false,last=null,createdLink="";
+  ctx.strokeStyle="#111827";ctx.lineWidth=3.6;ctx.lineCap="round";ctx.lineJoin="round";
+  function pos(e){const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}
+  canvas.addEventListener("pointerdown",e=>{down=true;drawn=true;last=pos(e);canvas.setPointerCapture(e.pointerId);ctx.beginPath();ctx.arc(last.x,last.y,2,0,Math.PI*2);ctx.fill();});
+  canvas.addEventListener("pointermove",e=>{if(!down)return;const next=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(next.x,next.y);ctx.stroke();last=next;});
+  ["pointerup","pointercancel"].forEach(event=>canvas.addEventListener(event,()=>{down=false;last=null}));
+  $("ct-clear").onclick=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);drawn=false};
+  async function call(action,payload={}){
+    const {data:{session}}=await SB_SUPABASE.client.auth.getSession();
+    if(!session)throw new Error("Entre novamente no Smart Billing");
+    const res=await fetch(window.SMART_BILLING_CONFIG.supabaseUrl+"/functions/v1/sale-contracts",
+      {method:"POST",headers:{"Content-Type":"application/json","apikey":window.SMART_BILLING_CONFIG.supabaseAnonKey,
+      "Authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...payload})});
+    const out=await res.json();if(!res.ok)throw new Error(out.error||"Não foi possível completar a operação");return out;
+  }
+  async function list(){
+    const region=$("ct-list");
+    try{const response=await call("list");region.textContent="";
+      if(!response.contracts.length){region.textContent="Você ainda não criou nenhum contrato";return}
+      for(const c of response.contracts){
+        const el=document.createElement("div");el.className="ct-item";
+        const left=document.createElement("div"),title=document.createElement("div"),small=document.createElement("small");
+        title.className="ct-item-title";title.textContent=c.buyer_name||c.product_description;
+        small.textContent=new Date(c.created_at).toLocaleDateString("pt-BR")+" • "+(c.status==="signed"?"Assinado":"Aguardando assinatura");
+        left.append(title,small);
+        const right=document.createElement("div");right.className="ct-actions";
+        const status=document.createElement("span");status.className="ct-status "+(c.status==="signed"?"signed":"");status.textContent=c.status==="signed"?"Assinado":"Pendente";right.append(status);
+        if(c.status==="pending"){
+          const btn=document.createElement("button");btn.className="btn btn-secondary btn-sm";btn.textContent="Gerar link";
+          btn.title="Gera um novo link e invalida o anterior";
+          btn.onclick=async()=>{if(!confirm("Gerar um novo link? O link anterior deixará de funcionar."))return;
+            try{btn.disabled=true;const r=await call("refresh",{id:c.id});createdLink=signingLink(r.token);
+              $("ct-result").hidden=false;$("ct-url").textContent=createdLink;
+              $("ct-result").scrollIntoView({behavior:"smooth",block:"nearest"});
+            }catch(e){alert(e.message)}finally{btn.disabled=false}};
+          right.append(btn);
+        }
+        if(c.status==="signed"){
+          const btn=document.createElement("button");btn.className="btn btn-secondary btn-sm";btn.textContent="Baixar PDF";
+          btn.onclick=async()=>{try{btn.disabled=true;const r=await call("download",{id:c.id});window.open(r.url,"_blank","noopener,noreferrer")}catch(e){alert(e.message)}finally{btn.disabled=false}};
+          right.append(btn);
+        }
+        el.append(left,right);region.append(el);
+      }
+    }catch(e){region.textContent="Falha ao carregar contratos: "+e.message}
+  }
+  $("ct-form").addEventListener("submit",async e=>{
+    e.preventDefault();$("ct-error").textContent="";
+    if(!drawn){$("ct-error").textContent="Desenhe sua assinatura antes de continuar";return}
+    const btn=$("ct-submit");btn.disabled=true;btn.textContent="Gerando contrato…";
+    try{
+      const v=id=>$(id).value.trim();
+      const result=await call("create",{
+        seller_name:v("seller-name"),seller_cpf:v("seller-cpf"),seller_address:v("seller-address"),
+        pix_key:v("pix-key"),first_due_date:v("first-date"),
+        product_description:v("product"),product_serial:v("serial"),product_condition:v("condition"),
+        accessories:v("accessories"),signature_png:canvas.toDataURL("image/png")
+      });
+      createdLink=signingLink(result.token);$("ct-result").hidden=false;$("ct-url").textContent=createdLink;
+      $("ct-result").scrollIntoView({behavior:"smooth",block:"nearest"});await list();
+    }catch(err){$("ct-error").textContent=err.message}
+    finally{btn.disabled=false;btn.textContent="Gerar link para a compradora"}
+  });
+  $("ct-copy").onclick=async()=>{try{await navigator.clipboard.writeText(createdLink);$("ct-copy").textContent="Link copiado"}catch{prompt("Copie o link",createdLink)}};
+  await list();
+})();
+</script></body></html>
