@@ -181,6 +181,19 @@ Deno.serve(async(req:Request)=>{
         .eq("company_id",actor.company_id).order("created_at",{ascending:false}).limit(100);
       if(error)throw error;return reply({success:true,contracts:data});
     }
+    if(action==="refresh"){
+      const actor=await authUser(req);if(!actor)return reply({error:"Acesso nao autorizado"},401);
+      const id=plain(body.id,40);
+      const {data:c}=await admin.from("sale_contracts").select("id,status").eq("id",id)
+        .eq("company_id",actor.company_id).maybeSingle();
+      if(!c||c.status!=="pending")return reply({error:"Somente contratos pendentes permitem novo link"},409);
+      const raw=crypto.getRandomValues(new Uint8Array(32));
+      const token=btoa(String.fromCharCode(...raw)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+      const {error}=await admin.from("sale_contracts").update({token_hash:await hex(token)})
+        .eq("id",id).eq("status","pending");
+      if(error)throw error;
+      return reply({success:true,url:site+"/assinar-contrato.html?token="+token});
+    }
     if(action==="get"){
       const c=await byToken(plain(body.token,128));if(!c)return reply({error:"Link invalido ou expirado"},404);
       return reply({success:true,contract:{
