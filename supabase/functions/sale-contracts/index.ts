@@ -4,7 +4,7 @@ import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
 const url = Deno.env.get("SUPABASE_URL") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-const site = (Deno.env.get("PUBLIC_APP_URL") || "https://limaribeiroabraaolimaribeiro-afk.github.io/Smart-Billingg").replace(/\/+$/, "");
+const site = (Deno.env.get("PUBLIC_APP_URL") || "").replace(/\/+$/, "");
 const bucket = "sale-contracts-private";
 const admin = createClient(url, serviceKey);
 const CORS = {
@@ -148,6 +148,7 @@ Deno.serve(async(req:Request)=>{
     const body=await req.json();
     const action=plain(body.action,20);
     if(action==="create"){
+      if(!site)return reply({error:"PUBLIC_APP_URL nao configurada no servidor"},503);
       const actor=await authUser(req);if(!actor)return reply({error:"Acesso nao autorizado"},401);
       const vals={
         seller_name:plain(body.seller_name,120),seller_cpf:digits(plain(body.seller_cpf)),
@@ -182,6 +183,7 @@ Deno.serve(async(req:Request)=>{
       if(error)throw error;return reply({success:true,contracts:data});
     }
     if(action==="refresh"){
+      if(!site)return reply({error:"PUBLIC_APP_URL nao configurada no servidor"},503);
       const actor=await authUser(req);if(!actor)return reply({error:"Acesso nao autorizado"},401);
       const id=plain(body.id,40);
       const {data:c}=await admin.from("sale_contracts").select("id,status").eq("id",id)
