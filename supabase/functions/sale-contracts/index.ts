@@ -4,7 +4,7 @@ import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
 const url = Deno.env.get("SUPABASE_URL") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-const site = (Deno.env.get("PUBLIC_APP_URL") || "").replace(/\/+$/, "");
+
 const bucket = "sale-contracts-private";
 const admin = createClient(url, serviceKey);
 const CORS = {
@@ -148,7 +148,6 @@ Deno.serve(async(req:Request)=>{
     const body=await req.json();
     const action=plain(body.action,20);
     if(action==="create"){
-      if(!site)return reply({error:"PUBLIC_APP_URL nao configurada no servidor"},503);
       const actor=await authUser(req);if(!actor)return reply({error:"Acesso nao autorizado"},401);
       const vals={
         seller_name:plain(body.seller_name,120),seller_cpf:digits(plain(body.seller_cpf)),
@@ -173,7 +172,7 @@ Deno.serve(async(req:Request)=>{
         seller_signature_path:signaturePath,...vals
       });
       if(error)throw error;
-      return reply({success:true,id,status:"pending",url:site+"/assinar-contrato.html?token="+token});
+      return reply({success:true,id,status:"pending",token});
     }
     if(action==="list"){
       const actor=await authUser(req);if(!actor)return reply({error:"Acesso nao autorizado"},401);
@@ -194,7 +193,7 @@ Deno.serve(async(req:Request)=>{
       const {error}=await admin.from("sale_contracts").update({token_hash:await hex(token)})
         .eq("id",id).eq("status","pending");
       if(error)throw error;
-      return reply({success:true,url:site+"/assinar-contrato.html?token="+token});
+      return reply({success:true,token});
     }
     if(action==="get"){
       const c=await byToken(plain(body.token,128));if(!c)return reply({error:"Link invalido ou expirado"},404);
@@ -238,7 +237,7 @@ Deno.serve(async(req:Request)=>{
         const record={...c,...buyer,buyer_signature_path:path,signed_at,signed_ip:ip,signed_user_agent:ua,consent_version:"v1-2026-11-06"};
         const bytes=await createPDF(record);
         const pdfPath=c.id+"/contrato-assinado.pdf";
-        const {error:pdfErr}=await admin.storage.from(bucket).upload(pdfPath,bytes,{contentType:"application/pdf",upsert:false});
+        const {error:pdfErr}=await admin.storage.from(bucket).upload(pdfPath,bytes,{contentType:"application/pdf",upsert:true});
         if(pdfErr)throw pdfErr;
         const pdf_sha256=await hex(bytes);
         const {error:finishErr}=await admin.from("sale_contracts").update({
