@@ -175,6 +175,32 @@ Deno.serve(async(req:Request)=>{
       return reply({success:true,id,status:"pending",token});
     }
     // Evidencias adicionadas pelo vendedor autenticado, armazenadas fora do PDF assinado.
+    if(action==="installments_list"){
+      const actor=await authUser(req);
+      if(!actor)return reply({error:"Acesso administrativo necessario"},401);
+      const id=plain(body.id,40);
+      const {data:contract}=await admin.from("sale_contracts")
+        .select("id,status,company_id").eq("id",id).eq("company_id",actor.company_id).maybeSingle();
+      if(!contract)return reply({error:"Contrato nao encontrado"},404);
+      const {data:installments,error}=await admin.from("sale_contract_installments")
+        .select("installment_number,contract_due_date,collection_due_date,grace_reason,charge_id")
+        .eq("contract_id",id).order("installment_number",{ascending:true});
+      if(error)throw error;
+      const chargeIds=(installments||[]).map(i=>i.charge_id);
+      if(chargeIds.length===0)return reply({success:true,installments:[]});
+      const {data:charges,error:chargeError}=await admin.from("charges")
+        .select("id,status,amount,public_token,charge_number,paid_at,checkout_url")
+        .eq("company_id",actor.company_id).in("id",chargeIds);
+      if(chargeError)throw chargeError;
+      const map=new Map((charges||[]).map(ch=>[ch.id,ch]));
+      return reply({success:true,installments:(installments||[]).map(i=>{
+        const ch=map.get(i.charge_id);
+        return {number:i.installment_number,contract_due_date:i.contract_due_date,
+          due_date:i.collection_due_date,grace_reason:i.grace_reason,charge_number:ch?.charge_number,
+          status:ch?.status,amount:ch?.amount,public_token:ch?.public_token,
+          has_checkout:!!ch?.checkout_url,paid_at:ch?.paid_at};
+      })});
+    }
     if(action==="evidence_add" || action==="evidence_list" || action==="evidence_link"){
       const actor=await authUser(req);
       if(!actor)return reply({error:"Acesso administrativo necessario"},401);
