@@ -134,24 +134,41 @@
     if(digits.length===10||digits.length===11)return "55"+digits;
     return "";
   };
+  const moneyBRL=value=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(value));
+  let installmentsBuyerFirstName="";
   const paymentMessage=(i,link)=>{
-    const isTodayFirst=i.number===1 &&
-      new Intl.DateTimeFormat("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",year:"numeric"})
-        .format(new Date())==="07/11/2026";
-    if(isTodayFirst)
-      return "oii moça já deixei o link pra pagar a primeira parcela do notebook\n\n"+
-        "ficou 185 reais pra hoje sem multa nem juros\n\n"+
-        "é só abrir o link e clicar em pagar agora\n\n"+link;
-    return "oii moça tudo bem\n\n"+
-      "já deixei o link pra pagar a parcela "+i.number+"/10 do notebook no valor de 185 reais\n\n"+
-      "o vencimento é dia "+formatDateBR(i.due_date)+"\n\n"+
-      "é só abrir o link e clicar em pagar agora\n\n"+link;
+    const today=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+    const isGraceToday=i.number===1 && today==="2026-11-07";
+    const name=installmentsBuyerFirstName?" "+installmentsBuyerFirstName:"";
+    const lines=[
+      "oii"+name+" tudo bem",
+      "",
+      "tô te mandando o link pra pagar a parcela "+String(i.number).padStart(2,"0")+"/10 do notebook conforme a gente combinou",
+      "",
+      "💰 valor: "+moneyBRL(i.amount),
+      "📅 vencimento: "+formatDateBR(i.due_date),
+      "📝 referente ao notebook ASUS VivoBook",
+      "🔖 código: "+i.charge_number,
+    ];
+    if(isGraceToday){
+      lines.push("","pra hoje ficou sem multa nem juros");
+    }
+    lines.push(
+      "",
+      "é só abrir o link e clicar em pagar agora",
+      "",
+      link,
+      "",
+      "quando fizer o pagamento me avisa por aqui"
+    );
+    return lines.join("\n");
   };
 
   let installmentsBuyerPhone="";
   async function openInstallments(contract){
     installmentsContractId=contract.id;
     installmentsBuyerPhone=whatsappNumber(contract.buyer_phone);
+    installmentsBuyerFirstName=String(contract.buyer_name||"").trim().split(/\s+/)[0]||"";
     $("ct-installments-panel").hidden=false;
     $("ct-installments-description").textContent=
       "Parcelamento do "+contract.product_description+
@@ -174,7 +191,7 @@
         const title=document.createElement("strong");title.textContent="Parcela "+i.number+"/10 · R$ 185";
         const detail=document.createElement("small");
         detail.textContent="Vencimento: "+formatDateBR(i.due_date)+
-          (i.number===1?" (tolerância de 1 dia, sem encargos hoje)":"")+
+          (i.number===1?" (tolerância até 07/11/2026 sem encargos naquele dia)":"")+
           " · "+(i.status==="paid"?"Pago":i.status==="cancelled"?"Cancelado":i.status==="overdue"?"Vencido":"Pendente");
         if(i.status==="paid")paidCount++;
         info.append(title,detail);
