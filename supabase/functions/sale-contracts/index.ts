@@ -272,7 +272,7 @@ Deno.serve(async(req:Request)=>{
     if(action==="list"){
       const actor=await authUser(req);if(!actor)return reply({error:"Acesso nao autorizado"},401);
       const {data,error}=await admin.from("sale_contracts")
-        .select("id,status,created_at,signed_at,product_description,first_due_date,buyer_name,email_buyer_status,email_seller_status")
+        .select("id,status,created_at,signed_at,product_description,first_due_date,buyer_name,buyer_phone,email_buyer_status,email_seller_status")
         .eq("company_id",actor.company_id).order("created_at",{ascending:false}).limit(100);
       if(error)throw error;return reply({success:true,contracts:data});
     }
