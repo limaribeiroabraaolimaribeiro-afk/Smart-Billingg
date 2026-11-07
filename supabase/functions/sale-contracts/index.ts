@@ -174,6 +174,75 @@ Deno.serve(async(req:Request)=>{
       if(error)throw error;
       return reply({success:true,id,status:"pending",token});
     }
+    // Evidencias adicionadas pelo vendedor autenticado, armazenadas fora do PDF assinado.
+    if(action==="evidence_add" || action==="evidence_list" || action==="evidence_link"){
+      const actor=await authUser(req);
+      if(!actor)return reply({error:"Acesso administrativo necessario"},401);
+      const id=plain(body.id,40);
+      if(!/^[0-9a-f-]{36}$/i.test(id))return reply({error:"Contrato invalido"},400);
+      const {data:contract, error:contractErr}=await admin.from("sale_contracts")
+        .select("id,company_id").eq("id",id).eq("company_id",actor.company_id).maybeSingle();
+      if(contractErr||!contract)return reply({error:"Contrato nao encontrado"},404);
+
+      if(action==="evidence_list"){
+        const {data, error}=await admin.from("sale_contract_evidence")
+          .select("id,original_name,mime_type,file_size,sha256,created_at")
+          .eq("contract_id",id).eq("company_id",actor.company_id)
+          .order("created_at",{ascending:true});
+        if(error)throw error;
+        return reply({success:true,evidence:data||[]});
+      }
+      if(action==="evidence_link"){
+        const evidenceId=plain(body.evidence_id,40);
+        if(!/^[0-9a-f-]{36}$/i.test(evidenceId))return reply({error:"Arquivo invalido"},400);
+        const {data:evidence}=await admin.from("sale_contract_evidence")
+          .select("storage_path,original_name").eq("id",evidenceId)
+          .eq("contract_id",id).eq("company_id",actor.company_id).maybeSingle();
+        if(!evidence)return reply({error:"Arquivo nao encontrado"},404);
+        const {data:link,error:linkErr}=await admin.storage.from(bucket).createSignedUrl(evidence.storage_path,120);
+        if(linkErr||!link?.signedUrl)throw new Error("Falha ao obter arquivo");
+        return reply({success:true,url:link.signedUrl,name:evidence.original_name});
+      }
+      // O navegador envia bytes originais JPEG/PNG/PDF em base64, sem recompressao.
+      const base64=body.data_base64;
+      const mime=plain(body.mime_type,40);
+      const name=plain(body.file_name,150).replace(/[^A-Za-z0-9._ ()-]/g,"_")||"evidencia";
+      if(!["image/jpeg","image/png","application/pdf"].includes(mime))
+        return reply({error:"Use JPG, PNG ou PDF"},422);
+      if(typeof base64!=="string"||base64.length<100||base64.length>7000000||!/^[A-Za-z0-9+/]*={0,2}$/.test(base64))
+        return reply({error:"Arquivo invalido ou muito grande (maximo 5 MB)"},422);
+      let bytes:Uint8Array;
+      try{bytes=Uint8Array.from(atob(base64),v=>v.charCodeAt(0));}
+      catch{return reply({error:"Conteudo do arquivo invalido"},422);}
+      if(bytes.length<80||bytes.length>5242880)return reply({error:"Limite de 5 MB por arquivo"},422);
+      const jpg=bytes[0]===255&&bytes[1]===216&&bytes[2]===255;
+      const png=bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71;
+      const pdf=bytes[0]===37&&bytes[1]===80&&bytes[2]===68&&bytes[3]===70;
+      if(!((mime==="image/jpeg"&&jpg)||(mime==="image/png"&&png)||(mime==="application/pdf"&&pdf)))
+        return reply({error:"Formato real do arquivo diferente do informado"},422);
+      const sha256=await hex(bytes);
+      const {data:duplicate}=await admin.from("sale_contract_evidence").select("id")
+        .eq("contract_id",id).eq("sha256",sha256).maybeSingle();
+      if(duplicate)return reply({success:true,already_exists:true,id:duplicate.id,sha256});
+      const {count}=await admin.from("sale_contract_evidence").select("id",{count:"exact",head:true}).eq("contract_id",id);
+      if((count||0)>=30)return reply({error:"Limite de 30 anexos por contrato"},422);
+      const evidenceId=crypto.randomUUID();
+      const ext=mime==="image/jpeg"?"jpg":mime==="image/png"?"png":"pdf";
+      const storagePath=id+"/evidence/"+evidenceId+"."+ext;
+      const {error:uploadError}=await admin.storage.from(bucket)
+        .upload(storagePath,bytes,{contentType:mime,upsert:false});
+      if(uploadError)throw uploadError;
+      const {error:insertError}=await admin.from("sale_contract_evidence").insert({
+        id:evidenceId,contract_id:id,company_id:actor.company_id,
+        uploaded_by:actor.user.id,original_name:name,storage_path:storagePath,
+        mime_type:mime,file_size:bytes.length,sha256
+      });
+      if(insertError){
+        await admin.storage.from(bucket).remove([storagePath]);
+        throw insertError;
+      }
+      return reply({success:true,id:evidenceId,sha256,file_name:name,size:bytes.length});
+    }
     if(action==="list"){
       const actor=await authUser(req);if(!actor)return reply({error:"Acesso nao autorizado"},401);
       const {data,error}=await admin.from("sale_contracts")
@@ -182,7 +251,6 @@ Deno.serve(async(req:Request)=>{
       if(error)throw error;return reply({success:true,contracts:data});
     }
     if(action==="refresh"){
-      if(!site)return reply({error:"PUBLIC_APP_URL nao configurada no servidor"},503);
       const actor=await authUser(req);if(!actor)return reply({error:"Acesso nao autorizado"},401);
       const id=plain(body.id,40);
       const {data:c}=await admin.from("sale_contracts").select("id,status").eq("id",id)

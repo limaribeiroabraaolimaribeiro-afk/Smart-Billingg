@@ -26,6 +26,13 @@
 .ct-status.signed{background:#d1fae5;color:#065f46}
 .ct-item{border-top:1px solid #e8eaf1;padding:14px 0;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
 .ct-item-title{font-weight:700;font-size:14px}.ct-item small{color:#667085}
+.ct-evidence-panel{border:1px solid #dce3f3;border-radius:14px;padding:18px;background:#f9fbff;margin-top:15px}
+.ct-evidence-panel[hidden]{display:none!important}.ct-evidence-list{margin-top:16px}
+.ct-evidence-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-top:1px solid #e5e9f3;padding:12px 0}
+.ct-evidence-row div{min-width:0;flex:1}.ct-evidence-row strong{display:block;font-size:13px;overflow-wrap:anywhere}
+.ct-evidence-row small{color:#717c91;display:block;font-size:11px;margin-top:5px}
+.ct-file{display:block;margin:10px 0;font-size:14px;max-width:100%}
+.ct-progress{font-size:13px;margin:12px 0;min-height:20px}
 #ct-error{color:#b91c1c;font-size:13px;margin:10px 0}
 @media(max-width:650px){.ct-grid{grid-template-columns:1fr}.ct-card{padding:16px}}
 </style>
@@ -63,7 +70,17 @@
 </form>
 <div id="ct-result" hidden class="ct-result"><strong>Contrato criado!</strong><p>Copie e envie o link pelo WhatsApp:</p><p id="ct-url"></p><button class="btn btn-secondary btn-sm" id="ct-copy" type="button">Copiar link</button></div>
 </section>
-<section class="ct-card"><h2>Contratos criados</h2><p class="ct-desc">A cópia assinada fica no armazenamento privado e pode ser baixada aqui.</p><div id="ct-list">Carregando contratos…</div></section>
+<section class="ct-card"><h2>Contratos criados</h2><p class="ct-desc">A cópia assinada fica no armazenamento privado e pode ser baixada aqui.</p><div id="ct-list">Carregando contratos…</div>
+<div class="ct-evidence-panel" id="ct-evidence-panel" hidden>
+  <h3 style="margin:0 0 7px;font-size:17px">Provas da negociação</h3>
+  <p class="ct-desc" id="ct-evidence-description">Guarde capturas de conversa, fotos do notebook e outros documentos do contrato. Somente administradores têm acesso.</p>
+  <label for="ct-evidence-files" style="font-size:13px;font-weight:700">Selecionar fotos originais (JPG ou PNG) ou PDFs</label>
+  <input class="ct-file" id="ct-evidence-files" type="file" multiple accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf">
+  <p class="ct-help">Máximo de 5 MB por arquivo e 30 anexos por contrato. As imagens ficam armazenadas sem alterações e cada uma recebe um código SHA-256 de integridade.</p>
+  <button class="btn btn-primary" id="ct-evidence-upload" type="button">Salvar provas no contrato</button>
+  <p id="ct-evidence-progress" class="ct-progress" role="status" aria-live="polite"></p>
+  <div class="ct-evidence-list" id="ct-evidence-list"></div>
+</div></section>
 </div></div>
 <script src="assets/js/icons.js"></script><script src="assets/js/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -91,6 +108,81 @@
       "Authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...payload})});
     const out=await res.json();if(!res.ok)throw new Error(out.error||"Não foi possível completar a operação");return out;
   }
+  let evidenceContractId=null;
+  const evidencePanel=$("ct-evidence-panel"),evidenceInput=$("ct-evidence-files");
+  const evidenceStatus=$("ct-evidence-progress"),evidenceList=$("ct-evidence-list");
+  async function openEvidence(contract){
+    evidenceContractId=contract.id;
+    $("ct-evidence-description").textContent="Contrato do "+contract.product_description+
+       " • "+(contract.buyer_name||"aguardando assinatura")+" • arquivos privados";
+    evidenceInput.value="";evidencePanel.hidden=false;
+    evidencePanel.scrollIntoView({behavior:"smooth",block:"start"});
+    await refreshEvidence();
+  }
+  async function refreshEvidence(){
+    evidenceList.textContent="Carregando anexos...";
+    if(!evidenceContractId)return;
+    try{
+      const {evidence}=await call("evidence_list",{id:evidenceContractId});
+      evidenceList.textContent="";
+      if(!evidence.length){
+        evidenceList.textContent="Nenhuma prova anexada ainda";return;
+      }
+      const title=document.createElement("p");title.className="ct-help";
+      title.textContent=evidence.length+" arquivo(s) anexado(s)";evidenceList.append(title);
+      for(const item of evidence){
+        const wrap=document.createElement("div");wrap.className="ct-evidence-row";
+        const info=document.createElement("div");
+        const name=document.createElement("strong");name.textContent=item.original_name;
+        const detail=document.createElement("small");
+        detail.textContent=(item.file_size/1024).toFixed(0)+" KB · "+new Date(item.created_at).toLocaleString("pt-BR")+
+          " · SHA-256: "+item.sha256.slice(0,16)+"…";
+        info.append(name,detail);
+        const button=document.createElement("button");button.className="btn btn-secondary btn-sm";
+        button.type="button";button.textContent="Abrir original";
+        button.onclick=async()=>{
+          button.disabled=true;
+          try{
+            const {url}=await call("evidence_link",{id:evidenceContractId,evidence_id:item.id});
+            window.open(url,"_blank","noopener,noreferrer");
+          }catch(err){alert(err.message)}
+          finally{button.disabled=false}
+        };
+        wrap.append(info,button);evidenceList.append(wrap);
+      }
+    }catch(err){evidenceList.textContent="Erro ao carregar provas: "+err.message}
+  }
+  const base64Original=async file=>{
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    let encoded="";
+    for(let i=0;i<bytes.length;i+=0x8000)
+      encoded+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+    return btoa(encoded);
+  };
+  $("ct-evidence-upload").onclick=async()=>{
+    if(!evidenceContractId)return;
+    const files=[...evidenceInput.files];
+    if(!files.length){evidenceStatus.textContent="Selecione pelo menos uma imagem ou PDF";return;}
+    if(files.length>30){evidenceStatus.textContent="Selecione no máximo 30 arquivos";return;}
+    const allowed=new Set(["image/jpeg","image/png","application/pdf"]);
+    const button=$("ct-evidence-upload");button.disabled=true;
+    let saved=0;
+    try{
+      for(const [i,file] of files.entries()){
+        evidenceStatus.textContent="Enviando "+(i+1)+"/"+files.length+" · "+file.name;
+        const mime=file.type||(/\.jpe?g$/i.test(file.name)?"image/jpeg":/\.png$/i.test(file.name)?"image/png":/\.pdf$/i.test(file.name)?"application/pdf":"");
+        if(!allowed.has(mime)||file.size>5242880||file.size<80)
+          throw new Error("Arquivo não aceito ou maior que 5 MB: "+file.name);
+        const result=await call("evidence_add",{
+          id:evidenceContractId,file_name:file.name,mime_type:mime,data_base64:await base64Original(file)
+        });
+        if(result.success)saved++;
+      }
+      evidenceInput.value="";
+      evidenceStatus.textContent="Concluído: "+saved+" arquivo(s) verificados e armazenados no contrato";
+    }catch(err){evidenceStatus.textContent="Foram salvos "+saved+" arquivo(s). Erro: "+err.message}
+    finally{button.disabled=false;await refreshEvidence()}
+  };
   async function list(){
     const region=$("ct-list");
     try{const response=await call("list");region.textContent="";
@@ -103,6 +195,11 @@
         left.append(title,small);
         const right=document.createElement("div");right.className="ct-actions";
         const status=document.createElement("span");status.className="ct-status "+(c.status==="signed"?"signed":"");status.textContent=c.status==="signed"?"Assinado":"Pendente";right.append(status);
+        const evidenceButton=document.createElement("button");
+        evidenceButton.className="btn btn-secondary btn-sm";evidenceButton.type="button";
+        evidenceButton.textContent="Provas / Anexos";
+        evidenceButton.onclick=()=>openEvidence(c);
+        right.append(evidenceButton);
         if(c.status==="pending"){
           const btn=document.createElement("button");btn.className="btn btn-secondary btn-sm";btn.textContent="Gerar link";
           btn.title="Gera um novo link e invalida o anterior";
