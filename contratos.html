@@ -26,6 +26,13 @@
 .ct-status.signed{background:#d1fae5;color:#065f46}
 .ct-item{border-top:1px solid #e8eaf1;padding:14px 0;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
 .ct-item-title{font-weight:700;font-size:14px}.ct-item small{color:#667085}
+.ct-installments-panel{margin:16px 0;padding:18px;background:#f6f8ff;border:1px solid #dce3f2;border-radius:14px}
+.ct-installments-panel[hidden]{display:none!important}
+.ct-installment-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;border-top:1px solid #dce3f2;padding:12px 0}
+.ct-installment-row small{display:block;color:#6c7890;font-size:12px;margin-top:4px}
+.ct-installment-row strong{font-size:13px}
+.ct-installment-row .ct-actions{margin-left:auto}
+.ct-warning-note{font-size:12px;color:#725522;background:#fffaea;padding:12px;border-radius:8px;margin:12px 0}
 .ct-evidence-panel{border:1px solid #dce3f3;border-radius:14px;padding:18px;background:#f9fbff;margin-top:15px}
 .ct-evidence-panel[hidden]{display:none!important}.ct-evidence-list{margin-top:16px}
 .ct-evidence-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-top:1px solid #e5e9f3;padding:12px 0}
@@ -71,6 +78,13 @@
 <div id="ct-result" hidden class="ct-result"><strong>Contrato criado!</strong><p>Copie e envie o link pelo WhatsApp:</p><p id="ct-url"></p><button class="btn btn-secondary btn-sm" id="ct-copy" type="button">Copiar link</button></div>
 </section>
 <section class="ct-card"><h2>Contratos criados</h2><p class="ct-desc">A cópia assinada fica no armazenamento privado e pode ser baixada aqui.</p><div id="ct-list">Carregando contratos…</div>
+<div class="ct-installments-panel" id="ct-installments-panel" hidden>
+  <h3 style="font-size:18px;margin:0 0 8px">Parcelas do contrato</h3>
+  <p class="ct-desc" id="ct-installments-description"></p>
+  <p class="ct-warning-note">A primeira parcela teve o prazo de cobrança estendido até 07/11/2026, sem multa nesse dia. O contrato assinado mantém o vencimento original de 06/11/2026. O pagamento só será considerado realizado após confirmação.</p>
+  <div id="ct-installments-list"></div>
+  <button type="button" class="btn btn-secondary btn-sm" id="ct-refresh-installments">Atualizar situação</button>
+</div>
 <div class="ct-evidence-panel" id="ct-evidence-panel" hidden>
   <h3 style="margin:0 0 7px;font-size:17px">Provas da negociação</h3>
   <p class="ct-desc" id="ct-evidence-description">Guarde capturas de conversa, fotos do notebook e outros documentos do contrato. Somente administradores têm acesso.</p>
@@ -108,6 +122,62 @@
       "Authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...payload})});
     const out=await res.json();if(!res.ok)throw new Error(out.error||"Não foi possível completar a operação");return out;
   }
+  let installmentsContractId=null;
+  const installmentLink=token=>{
+    const url=new URL("cobranca-publica.html",window.location.href);
+    url.searchParams.set("token",token);return url.href;
+  };
+  const formatDateBR=date=>String(date).split("-").reverse().join("/");
+  async function openInstallments(contract){
+    installmentsContractId=contract.id;
+    $("ct-installments-panel").hidden=false;
+    $("ct-installments-description").textContent=
+      "Parcelamento do "+contract.product_description+
+      " • 10x R$ 185 via Pix • "+(contract.buyer_name||"Compradora");
+    await refreshInstallments();
+    $("ct-installments-panel").scrollIntoView({behavior:"smooth",block:"start"});
+  }
+  async function refreshInstallments(){
+    const list=$("ct-installments-list");
+    if(!installmentsContractId)return;
+    list.textContent="Consultando parcelas...";
+    try{
+      const {installments}=await call("installments_list",{id:installmentsContractId});
+      list.textContent="";
+      if(!installments?.length){list.textContent="Ainda não existem parcelas vinculadas a esse contrato";return;}
+      let paidCount=0;
+      for(const i of installments){
+        const row=document.createElement("div");row.className="ct-installment-row";
+        const info=document.createElement("div");
+        const title=document.createElement("strong");title.textContent="Parcela "+i.number+"/10 · R$ 185";
+        const detail=document.createElement("small");
+        detail.textContent="Vencimento: "+formatDateBR(i.due_date)+
+          (i.number===1?" (tolerância de 1 dia, sem encargos hoje)":"")+
+          " · "+(i.status==="paid"?"Pago":i.status==="cancelled"?"Cancelado":i.status==="overdue"?"Vencido":"Pendente");
+        if(i.status==="paid")paidCount++;
+        info.append(title,detail);
+        const actions=document.createElement("div");actions.className="ct-actions";
+        if(i.status!=="paid"&&i.status!=="cancelled"&&i.public_token){
+          const btn=document.createElement("button");
+          btn.className="btn btn-secondary btn-sm";btn.textContent="Copiar link";
+          btn.onclick=async()=>{
+            const link=installmentLink(i.public_token);
+            try{await navigator.clipboard.writeText(link);btn.textContent="Copiado"}catch{prompt("Copie o link",link)}
+          };
+          const open=document.createElement("button");
+          open.className="btn btn-secondary btn-sm";open.textContent="Abrir";
+          open.onclick=()=>window.open(installmentLink(i.public_token),"_blank","noopener,noreferrer");
+          actions.append(btn,open);
+        }
+        row.append(info,actions);list.append(row);
+      }
+      const summary=document.createElement("p");summary.style.fontWeight="700";summary.style.marginTop="12px";
+      summary.textContent="Recebido: R$ "+(paidCount*185).toLocaleString("pt-BR")+
+        " · Saldo em parcelas: R$ "+((10-paidCount)*185).toLocaleString("pt-BR");
+      list.append(summary);
+    }catch(e){list.textContent="Falha ao consultar parcelas: "+e.message}
+  }
+  $("ct-refresh-installments").onclick=()=>refreshInstallments();
   let evidenceContractId=null;
   const evidencePanel=$("ct-evidence-panel"),evidenceInput=$("ct-evidence-files");
   const evidenceStatus=$("ct-evidence-progress"),evidenceList=$("ct-evidence-list");
@@ -195,6 +265,11 @@
         left.append(title,small);
         const right=document.createElement("div");right.className="ct-actions";
         const status=document.createElement("span");status.className="ct-status "+(c.status==="signed"?"signed":"");status.textContent=c.status==="signed"?"Assinado":"Pendente";right.append(status);
+        const installmentButton=document.createElement("button");
+        installmentButton.className="btn btn-secondary btn-sm";
+        installmentButton.type="button";installmentButton.textContent="Parcelas";
+        installmentButton.onclick=()=>openInstallments(c);
+        right.append(installmentButton);
         const evidenceButton=document.createElement("button");
         evidenceButton.className="btn btn-secondary btn-sm";evidenceButton.type="button";
         evidenceButton.textContent="Provas / Anexos";
