@@ -206,10 +206,8 @@
     </div>` : '';
 
   // ---- Payable state (pendente / atrasado) ----
-  // Forma de pagamento e parcelamento são escolhidos pelo cliente dentro do
-  // checkout da InfinitePay — nunca aqui. Mostrar/deixar escolher isso nesta
-  // página prometeria algo que o clique em "Pagar agora" não cumpre (o
-  // redirecionamento é sempre para o checkout_url já pronto, de qualquer forma).
+  // Pagamentos em aberto podem gerar checkout sob demanda quando ainda não
+  // possuem checkout_url. O servidor define valor e destino via token.
   const hasCheckout = Boolean(cobranca.checkoutUrl);
   const isOverdue = cobranca.status === 'atrasado';
 
@@ -254,10 +252,10 @@
     // com o valor original (sem multa/juros) — nunca reaproveita direto.
     // O servidor recalcula e trava o valor de hoje antes de gerar um link
     // novo (create-checkout-for-token / resolveChargeCheckoutUrl).
-    if (isOverdue) {
+    if (isOverdue || !hasCheckout) {
       payBtn.disabled = true;
       const originalLabel = payBtnLabel.textContent;
-      payBtnLabel.textContent = 'Calculando valor atualizado…';
+      payBtnLabel.textContent = isOverdue ? 'Calculando valor atualizado…' : 'Gerando link de pagamento…';
       try {
         const result = await DB.cobrancas.gerarCheckoutAtualizado(token);
         if (result?.success && result.checkout_url) {
