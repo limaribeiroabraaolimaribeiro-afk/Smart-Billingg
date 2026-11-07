@@ -128,8 +128,30 @@
     url.searchParams.set("token",token);return url.href;
   };
   const formatDateBR=date=>String(date).split("-").reverse().join("/");
+  const whatsappNumber=raw=>{
+    const digits=String(raw||"").replace(/\D/g,"");
+    if((digits.length===12||digits.length===13)&&digits.startsWith("55"))return digits;
+    if(digits.length===10||digits.length===11)return "55"+digits;
+    return "";
+  };
+  const paymentMessage=(i,link)=>{
+    const isTodayFirst=i.number===1 &&
+      new Intl.DateTimeFormat("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",year:"numeric"})
+        .format(new Date())==="07/11/2026";
+    if(isTodayFirst)
+      return "oii moça já deixei o link pra pagar a primeira parcela do notebook\n\n"+
+        "ficou 185 reais pra hoje sem multa nem juros\n\n"+
+        "é só abrir o link e clicar em pagar agora\n\n"+link;
+    return "oii moça tudo bem\n\n"+
+      "já deixei o link pra pagar a parcela "+i.number+"/10 do notebook no valor de 185 reais\n\n"+
+      "o vencimento é dia "+formatDateBR(i.due_date)+"\n\n"+
+      "é só abrir o link e clicar em pagar agora\n\n"+link;
+  };
+
+  let installmentsBuyerPhone="";
   async function openInstallments(contract){
     installmentsContractId=contract.id;
+    installmentsBuyerPhone=whatsappNumber(contract.buyer_phone);
     $("ct-installments-panel").hidden=false;
     $("ct-installments-description").textContent=
       "Parcelamento do "+contract.product_description+
@@ -158,16 +180,30 @@
         info.append(title,detail);
         const actions=document.createElement("div");actions.className="ct-actions";
         if(i.status!=="paid"&&i.status!=="cancelled"&&i.public_token){
-          const btn=document.createElement("button");
-          btn.className="btn btn-secondary btn-sm";btn.textContent="Copiar link";
-          btn.onclick=async()=>{
-            const link=installmentLink(i.public_token);
-            try{await navigator.clipboard.writeText(link);btn.textContent="Copiado"}catch{prompt("Copie o link",link)}
+          const link=installmentLink(i.public_token);
+          const message=paymentMessage(i,link);
+          const copy=document.createElement("button");
+          copy.className="btn btn-primary btn-sm";copy.type="button";copy.textContent="Copiar mensagem";
+          copy.onclick=async()=>{
+            try{
+              await navigator.clipboard.writeText(message);
+              copy.textContent="Mensagem copiada";
+            }catch{
+              prompt("Copie a mensagem completa para o WhatsApp",message);
+            }
+          };
+          const whatsapp=document.createElement("button");
+          whatsapp.className="btn btn-secondary btn-sm";whatsapp.type="button";
+          whatsapp.textContent="Enviar no WhatsApp";
+          whatsapp.title="Abre o WhatsApp com a mensagem pronta para você conferir e enviar";
+          whatsapp.onclick=()=>{
+            const target="https://wa.me/"+installmentsBuyerPhone+"?text="+encodeURIComponent(message);
+            window.open(target,"_blank","noopener,noreferrer");
           };
           const open=document.createElement("button");
-          open.className="btn btn-secondary btn-sm";open.textContent="Abrir";
-          open.onclick=()=>window.open(installmentLink(i.public_token),"_blank","noopener,noreferrer");
-          actions.append(btn,open);
+          open.className="btn btn-secondary btn-sm";open.type="button";open.textContent="Abrir pagamento";
+          open.onclick=()=>window.open(link,"_blank","noopener,noreferrer");
+          actions.append(copy,whatsapp,open);
         }
         row.append(info,actions);list.append(row);
       }
