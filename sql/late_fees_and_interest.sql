@@ -255,7 +255,7 @@ begin
     -- least(...,2.00) reforça o teto legal mesmo se a coluna tiver sido
     -- alterada por algum caminho que não passe pelo CHECK (defesa em camadas).
     v_fee := round(v_charge.amount * (least(v_company.late_fee_percent, 2.00) / 100), 2);
-    v_interest := round(v_charge.amount * (v_company.late_interest_monthly_percent / 100) * (v_billable_days::numeric / 30), 2);
+    v_interest := round(v_charge.amount * (v_company.late_interest_monthly_percent / 100) * v_billable_days::numeric / 30, 2);
   end if;
 
   return query select
