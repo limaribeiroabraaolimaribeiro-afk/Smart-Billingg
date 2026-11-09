@@ -58,13 +58,15 @@ const DB = (() => {
     const hojeMeiaNoite = new Date(new Date().toDateString());
     const diasAtraso = Math.max(0, Math.round((hojeMeiaNoite - vencimentoMeiaNoite) / 86400000));
 
+    // 5 dias corridos de tolerância: multa/juros somente a partir do 6º dia.
+    const diasComEncargos = Math.max(0, diasAtraso - 5);
     let multaValor = 0;
     let jurosValor = 0;
-    if (empresa?.lateFeeEnabled !== false && diasAtraso > 0) {
+    if (empresa?.lateFeeEnabled !== false && diasComEncargos > 0) {
       const multaPercent = Math.min(Number(empresa?.lateFeePercent ?? 2), 2);
       const jurosPercentMes = Number(empresa?.lateInterestMonthlyPercent ?? 1);
       multaValor = Math.round(cobranca.valor * (multaPercent / 100) * 100) / 100;
-      jurosValor = Math.round(cobranca.valor * (jurosPercentMes / 100) * (diasAtraso / 30) * 100) / 100;
+      jurosValor = Math.round(cobranca.valor * (jurosPercentMes / 100) * (diasComEncargos / 30) * 100) / 100;
     }
 
     return {
