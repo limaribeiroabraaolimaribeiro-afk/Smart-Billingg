@@ -70,6 +70,9 @@
   // é sempre igual a cobranca.valor.
   const valorExibido = cobranca.valorAtualizado != null ? cobranca.valorAtualizado : cobranca.valor;
   const temEncargos = cobranca.status === 'atrasado' && (cobranca.diasAtraso || 0) > 0 && valorExibido > cobranca.valor;
+  const emTolerancia = cobranca.status === 'atrasado' && cobranca.multaAtiva !== false && (cobranca.diasAtraso || 0) > 0 && (cobranca.diasAtraso || 0) <= 5;
+  const fimTolerancia = new Date(cobranca.vencimento);
+  fimTolerancia.setDate(fimTolerancia.getDate() + 5);
 
   function heroBlock() {
     return `
@@ -170,7 +173,7 @@
   // a condição de atraso precisa ser informada antes de incidir) ----
   const avisoPreVencimento = cobranca.status !== 'atrasado' && cobranca.multaAtiva !== false ? `
     <div class="secure-note" style="margin-top:var(--space-5);text-align:center;">
-      <span>Após o vencimento, poderão incidir multa de ${cobranca.multaPercent}% e juros de mora de ${cobranca.jurosPercentMes}% ao mês, calculados proporcionalmente aos dias de atraso.</span>
+      <span>Após 5 dias corridos de tolerância, poderão incidir multa de ${cobranca.multaPercent}% e juros de mora de ${cobranca.jurosPercentMes}% ao mês, proporcionais apenas aos dias após a tolerância.</span>
     </div>` : '';
 
   // ---- Painel de situação/encargos, no estilo "TMB", só quando vencida e
@@ -202,7 +205,7 @@
     <p class="state-block__desc" style="margin-top:8px;">Valor atualizado até ${SB_UI.formatDate(cobranca.calculadoEm || new Date())}.</p>` : cobranca.status === 'atrasado' ? `
     <div class="auth-alert" style="margin-top:16px;">
       ${SB_ICON.alertTriangle}
-      <span>Esta cobrança está vencida desde ${SB_UI.formatDate(cobranca.vencimento)}. Regularize o quanto antes.</span>
+      <span>${emTolerancia ? `Você pode pagar até ${SB_UI.formatDate(fimTolerancia)} sem multa nem juros (5 dias de tolerância).` : `Esta cobrança está vencida desde ${SB_UI.formatDate(cobranca.vencimento)}. Regularize o quanto antes.`}</span>
     </div>` : '';
 
   // ---- Payable state (pendente / atrasado) ----
@@ -210,6 +213,7 @@
   // possuem checkout_url. O servidor define valor e destino via token.
   const hasCheckout = Boolean(cobranca.checkoutUrl);
   const isOverdue = cobranca.status === 'atrasado';
+  const precisaAtualizarCheckout = isOverdue && (cobranca.diasAtraso || 0) > 5 && cobranca.multaAtiva !== false;
 
   region.innerHTML = shell(`
     ${heroBlock()}
@@ -248,14 +252,14 @@
   }
 
   payBtn.addEventListener('click', async () => {
-    // Cobrança vencida: o checkout_url já carregado pode ter sido gerado
+    // Após 5 dias de tolerância: o checkout_url já carregado pode ter sido gerado
     // com o valor original (sem multa/juros) — nunca reaproveita direto.
     // O servidor recalcula e trava o valor de hoje antes de gerar um link
     // novo (create-checkout-for-token / resolveChargeCheckoutUrl).
-    if (isOverdue || !hasCheckout) {
+    if (precisaAtualizarCheckout || !hasCheckout) {
       payBtn.disabled = true;
       const originalLabel = payBtnLabel.textContent;
-      payBtnLabel.textContent = isOverdue ? 'Calculando valor atualizado…' : 'Gerando link de pagamento…';
+      payBtnLabel.textContent = precisaAtualizarCheckout ? 'Calculando valor atualizado…' : 'Gerando link de pagamento…';
       try {
         const result = await DB.cobrancas.gerarCheckoutAtualizado(token);
         if (result?.success && result.checkout_url) {
