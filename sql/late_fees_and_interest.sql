@@ -8,11 +8,12 @@
 --
 -- REGRA DE NEGÓCIO (nunca calculada no navegador):
 --   multa  = valor_original * (late_fee_percent / 100)                  — uma vez só
---   juros  = valor_original * (late_interest_monthly_percent / 100) * (dias_atraso / 30)
+--   juros  = valor_original * (late_interest_monthly_percent / 100) * (max(dias_atraso - 5, 0) / 30)
 --   total  = valor_original + multa + juros
--- Juros simples (não compostos), proporcional por dia, começando no 1º dia
--- após due_date. Nunca incide sobre parcelamento do cartão da InfinitePay —
--- só sobre cobranças do Smart Billing que passaram da própria due_date.
+-- Cinco dias corridos de tolerância após due_date, sem multa nem juros.
+-- A partir do 6º dia de atraso, multa única e juros simples proporcionais
+-- SOMENTE aos dias após a tolerância (sem cobrança retroativa). Não incidem
+-- sobre parcelamento do cartão da InfinitePay.
 --
 -- charges.amount continua sendo o valor ORIGINAL, imutável — nada que já lê
 -- esse campo (listagens, recibos, relatórios) precisa mudar. O valor "vivo"
@@ -92,7 +93,7 @@ begin
 end $$;
 
 comment on column public.companies.late_fee_enabled is 'Se falso, cobranças vencidas nunca recebem multa/juros (updated_amount = amount sempre).';
-comment on column public.companies.late_fee_percent is 'Multa de mora, uma única vez após o vencimento. Máximo 2% (limite legal, CDC art. 52 §1º).';
+comment on column public.companies.late_fee_percent is 'Multa de mora, uma única vez a partir do 6º dia de atraso. Máximo 2% (limite legal, CDC art. 52 §1º).';
 comment on column public.companies.late_interest_monthly_percent is 'Juros de mora simples, ao mês, aplicados proporcionalmente aos dias de atraso.';
 
 
@@ -214,6 +215,9 @@ declare
   v_charge  public.charges%rowtype;
   v_company public.companies%rowtype;
   v_days    integer;
+  v_billable_days integer;
+  v_today   date := (now() at time zone 'America/Sao_Paulo')::date;
+  v_grace_days constant integer := 5;
   v_fee     numeric(12, 2) := 0;
   v_interest numeric(12, 2) := 0;
   v_has_pending_review boolean;
@@ -237,19 +241,21 @@ begin
       coalesce(v_charge.late_fee_amount, 0),
       coalesce(v_charge.late_interest_amount, 0),
       coalesce(v_charge.updated_amount, v_charge.amount),
-      coalesce(v_charge.late_fee_calculated_at::date, current_date);
+      coalesce((v_charge.late_fee_calculated_at at time zone 'America/Sao_Paulo')::date, v_today);
     return;
   end if;
 
   select * into v_company from public.companies where id = v_charge.company_id;
 
-  v_days := greatest(0, (current_date - v_charge.due_date))::integer;
+  v_days := greatest(0, (v_today - v_charge.due_date))::integer;
+  v_billable_days := greatest(0, v_days - v_grace_days);
 
-  if v_company.late_fee_enabled and v_days > 0 then
+  -- Dias 1 a 5 após o vencimento: sem multa nem juros. Dia 6: primeiro dia de juros.
+  if v_company.late_fee_enabled and v_billable_days > 0 then
     -- least(...,2.00) reforça o teto legal mesmo se a coluna tiver sido
     -- alterada por algum caminho que não passe pelo CHECK (defesa em camadas).
     v_fee := round(v_charge.amount * (least(v_company.late_fee_percent, 2.00) / 100), 2);
-    v_interest := round(v_charge.amount * (v_company.late_interest_monthly_percent / 100) * (v_days::numeric / 30), 2);
+    v_interest := round(v_charge.amount * (v_company.late_interest_monthly_percent / 100) * (v_billable_days::numeric / 30), 2);
   end if;
 
   return query select
@@ -259,11 +265,11 @@ begin
     v_fee,
     v_interest,
     v_charge.amount + v_fee + v_interest,
-    current_date;
+    v_today;
 end;
 $$;
 comment on function public.calculate_late_charges(uuid) is
-  'Calcula multa/juros de mora de uma cobrança (puro, não grava nada). Congela o valor após pago/cancelado/revisão pendente.';
+  'Calcula multa e juros só a partir do 6º dia após vencimento (5 dias corridos sem encargos). Preserva o histórico de pago/cancelado/revisão.';
 
 
 -- ============================================================================
