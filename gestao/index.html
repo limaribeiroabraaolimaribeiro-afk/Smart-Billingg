@@ -23,7 +23,16 @@
   .crm-side-action{width:100%;text-align:left}
   .crm-side-action .sidebar-link__icon{flex-shrink:0}
   .crm-topbar-breadcrumb{font-size:12px}
-  #new-button{gap:8px}
+  #new-button{gap:8px;flex-shrink:0}
+  #new-button .crm-plus-icon{font-size:22px;font-weight:600;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+  #new-button-label{white-space:nowrap}
+  @media(max-width:640px){
+    .topbar-left{flex:1;min-width:0}
+    .topbar-right{flex-shrink:0;gap:8px}
+    .topbar-right > #new-button{width:40px;min-width:40px;height:40px;min-height:40px;padding:0;border-radius:var(--radius-sm);display:inline-flex;justify-content:center;align-items:center}
+    .topbar-right > #new-button #new-button-label{display:none}
+    .topbar-right > #new-button .crm-plus-icon{display:inline-flex;font-size:25px;line-height:1}
+  }
   .crm-module{min-width:0}
   .crm-section-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:var(--space-6)}
   .crm-section-head .section-head__title{font-size:16px}
@@ -122,7 +131,7 @@
         </div>
       </div>
       <div class="topbar-right">
-        <button type="button" class="btn btn-primary" id="new-button">+ Novo lead</button>
+        <button type="button" class="btn btn-primary" id="new-button" aria-label="Novo lead" title="Novo lead"><span class="crm-plus-icon" aria-hidden="true">+</span><span id="new-button-label">Novo lead</span></button>
         <div class="topbar-user">
           <span class="avatar" id="user-avatar">GC</span>
           <span class="topbar-user__meta">
@@ -226,7 +235,7 @@
   }
   function render(){
     var info=pages[state.page];el('page-title').textContent=info[0];el('page-description').textContent=info[1];
-    el('new-button').textContent='+ '+info[2];el('section-title').textContent=info[0];
+    el('new-button-label').textContent=info[2];el('new-button').setAttribute('aria-label',info[2]);el('new-button').setAttribute('title',info[2]);el('section-title').textContent=info[0];
     el('section-hint').textContent=state.page==='overview'?'Oportunidades e performance em um único lugar':{leads:state.leads.length+' lead(s) cadastrado(s)',sales:state.sales.length+' venda(s) registrada(s)',meetings:state.meetings.length+' reunião(ões) cadastrada(s)',consultants:state.consultants.length+' consultor(es) cadastrado(s)'}[state.page];
     document.querySelectorAll('[data-page]').forEach(function(btn){btn.classList.toggle('is-active',btn.dataset.page===state.page);});
     el('workspace').innerHTML=state.page==='overview'?renderOverview():state.page==='leads'?renderLeads():state.page==='sales'?renderSales():state.page==='meetings'?renderMeetings():renderConsultants();
