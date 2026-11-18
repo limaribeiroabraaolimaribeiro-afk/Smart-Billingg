@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root{--ink:#171a1f;--muted:#777b85;--line:#eae6df;--cream:#f9f6f0;--white:#fff;--orange:#f57432;--orange-soft:#fff0e6;--sidebar:#18191d;--green:#19865b;--shadow:0 10px 35px rgba(36,31,25,.055)}
-    *{box-sizing:border-box}html{font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--cream)}
+    [hidden]{display:none!important}*{box-sizing:border-box}html{font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--cream)}
     body{margin:0}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}a{color:inherit;text-decoration:none}
     .shell{display:flex;min-height:100vh}.sidebar{width:236px;background:var(--sidebar);color:white;padding:28px 16px;display:flex;flex-direction:column;position:fixed;inset:0 auto 0 0;z-index:10}
     .brand{display:flex;align-items:center;gap:12px;padding:5px 11px 32px}.brand-icon{width:34px;height:34px;display:grid;place-items:center;background:var(--orange);color:#fff;border-radius:11px;font-weight:800;font-size:20px;transform:rotate(-6deg)}.brand strong{font-size:15px;letter-spacing:-.5px}.brand small{font-size:10px;color:#c6c4c1;display:block;margin-top:3px;letter-spacing:1px;text-transform:uppercase}
@@ -109,7 +109,7 @@
   function btnEdit(type,id){return '<button type="button" class="btn tiny ghost" data-edit="'+esc(type)+'" data-id="'+esc(id)+'">Editar</button>';}
   function msgEmpty(text){return '<div class="empty">'+esc(text)+'</div>';}
   function buildRows(rows,fields){if(!rows.length)return '<div class="card">'+msgEmpty('Nenhum registro encontrado. Cadastre o primeiro para começar.')+'</div>';
-    return '<div class="table-wrap"><table><thead><tr>'+fields.map(function(f){return '<th>'+f[0]+'</th>';}).join('')+'<th>Ações</th></tr></thead><tbody>'+rows.map(function(r){return '<tr>'+fields.map(function(f){return '<td>'+f[1](r)+'</td>';}).join('')+'<td>'+btnEdit(state.page,r.id)+'</td></tr>';}).join('')+'</tbody></table></div>';
+    return '<div class="table-wrap"><table><thead><tr>'+fields.map(function(f){return '<th>'+f[0]+'</th>';}).join('')+'<th>Ações</th></tr></thead><tbody>'+rows.map(function(r){return '<tr>'+fields.map(function(f){return '<td>'+f[1](r)+'</td>';}).join('')+'<td>'+btnEdit(state.page,r.id)+(state.page==='leads'?'<button type="button" class="btn tiny ghost" data-sell="'+esc(r.id)+'">Registrar venda</button>':'')+'</td></tr>';}).join('')+'</tbody></table></div>';
   }
   function sectionToolbar(types){
     return '<div class="toolbar"><input class="search" id="record-search" autocomplete="off" placeholder="Buscar por nome, serviço ou consultor..." value="'+esc(state.search)+'"><select class="filter" id="record-filter"><option value="">Todos os status</option>'+types.map(function(s){return '<option value="'+s+'" '+(state.status===s?'selected':'')+'>'+esc(statuses[s])+'</option>';}).join('')+'</select></div>';
@@ -267,7 +267,7 @@
   function changePage(page){state.page=page;state.search='';state.status='';render();}
   document.querySelectorAll('[data-page]').forEach(function(btn){btn.addEventListener('click',function(){changePage(btn.dataset.page);});});
   el('new-button').addEventListener('click',function(){openForm(state.page==='overview'?'leads':state.page);});
-  el('workspace').addEventListener('click',function(e){var btn=e.target.closest('[data-edit]');if(btn)openForm(btn.dataset.edit,btn.dataset.id);});
+  el('workspace').addEventListener('click',function(e){var sell=e.target.closest('[data-sell]');if(sell){var l=find('leads',sell.dataset.sell);if(l)openForm('sales',null,{lead_id:l.id,consultant_id:l.consultant_id,customer_name:l.name,service:l.service,amount:l.estimated_value});return;}var btn=e.target.closest('[data-edit]');if(btn)openForm(btn.dataset.edit,btn.dataset.id);});
   el('workspace').addEventListener('input',function(e){
     if(e.target.id==='record-search'){var n=e.target.selectionStart;state.search=e.target.value;render();var input=el('record-search');input.focus();input.setSelectionRange(n,n);}
   });
