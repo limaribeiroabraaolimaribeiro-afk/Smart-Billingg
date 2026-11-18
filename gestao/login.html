@@ -76,10 +76,28 @@
   document.getElementById('invite-help').textContent=invitation
     ? 'Convite recebido. Entre com uma conta existente ou use Primeiro acesso.'
     : 'Para criar um acesso, peça à administração seu link individual de convite.';
+  async function consultantAlreadyLinked(){
+    // Tokens are single use: check the active account binding before redeeming.
+    var current=await sb.auth.getUser();
+    if(current.error)throw current.error;
+    if(!current.data||!current.data.user)return false;
+    var linked=await sb.from('crm_consultants')
+      .select('id')
+      .eq('auth_user_id',current.data.user.id)
+      .eq('active',true)
+      .limit(1);
+    if(linked.error)throw linked.error;
+    return Boolean(linked.data&&linked.data.length);
+  }
   async function claimInvite(){
     if(!invitation)return;
+    if(await consultantAlreadyLinked())return;
     var response=await sb.rpc('crm_claim_invite',{p_token:invitation});
-    if(response.error)throw response.error;
+    if(response.error){
+      // Covers a concurrent confirmation/login that already consumed the token.
+      if(await consultantAlreadyLinked())return;
+      throw response.error;
+    }
   }
   function feedback(text,isError){message.hidden=false;message.textContent=text;message.className='crm-message'+(isError?' error':'');}
   function setTab(next){
