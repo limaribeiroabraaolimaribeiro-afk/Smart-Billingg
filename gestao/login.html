@@ -35,8 +35,8 @@
     <img class="crm-logo" src="../assets/img/logo.png" alt="Smart Billing">
     <h1>Gestão Comercial</h1>
     <p>Acesso da equipe dev.abraao. Faça login para registrar contatos, vendas, reuniões e anotações.</p>
-    <div class="crm-tabs" role="tablist">
-      <button type="button" data-tab="login" class="active">Entrar</button>
+    <div class="crm-tabs" role="tablist" hidden>
+      <button type="button" data-tab="login" class="active">Já tenho conta</button>
       <button type="button" data-tab="signup" hidden>Primeiro acesso</button>
     </div>
     <div id="feedback" class="crm-message" hidden role="status"></div>
@@ -71,6 +71,7 @@
   var invitation=new URLSearchParams(window.location.search).get('convite')||'';
   var withInvite=new URL('./login.html',window.location.href);
   if(invitation)withInvite.searchParams.set('convite',invitation);
+  document.querySelector('.crm-tabs').hidden=!invitation;
   document.querySelector('[data-tab="signup"]').hidden=!invitation;
   document.getElementById('invite-help').textContent=invitation
     ? 'Convite recebido. Entre com uma conta existente ou use Primeiro acesso.'
