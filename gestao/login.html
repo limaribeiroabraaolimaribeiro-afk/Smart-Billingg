@@ -6,6 +6,7 @@
 <meta name="robots" content="noindex,nofollow">
 <title>Entrar · Gestão Comercial</title>
 <link rel="icon" type="image/svg+xml" href="../assets/img/logo.svg">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/variables.css">
 <link rel="stylesheet" href="../assets/css/base.css">
 <link rel="stylesheet" href="../assets/css/components.css">
@@ -43,6 +44,11 @@
       <div class="field"><label for="email">E-mail de acesso</label><input class="input" id="email" type="email" autocomplete="email" required placeholder="seuemail@dominio.com"></div>
       <div class="field"><label for="password">Senha</label><input class="input" id="password" type="password" autocomplete="current-password" required minlength="6" placeholder="Sua senha"></div>
       <button type="submit" class="btn btn-primary btn-block" id="submit">Entrar na gestão</button>
+    </form>
+    <form class="crm-panel" id="crm-recovery-form" hidden>
+      <div class="field"><label for="new-password">Nova senha</label><input class="input" id="new-password" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="field"><label for="repeat-password">Confirme a nova senha</label><input class="input" id="repeat-password" type="password" autocomplete="new-password" minlength="8" required></div>
+      <button type="submit" class="btn btn-primary btn-block" id="recovery-save">Atualizar senha</button>
     </form>
     <div class="crm-footer">
       <button id="forgot" type="button">Esqueci minha senha</button>
@@ -85,6 +91,31 @@
   }
   document.querySelectorAll('[data-tab]').forEach(function(b){b.addEventListener('click',function(){setTab(b.dataset.tab);});});
   if(!sb){feedback('Não foi possível carregar a autenticação. Atualize a página.',true);btn.disabled=true;return;}
+  var recovery=document.getElementById('crm-recovery-form');
+  function startRecovery(){
+    document.querySelector('.crm-tabs').hidden=true;
+    form.hidden=true;
+    document.getElementById('forgot').hidden=true;
+    document.getElementById('invite-help').hidden=true;
+    recovery.hidden=false;
+    feedback('Defina sua nova senha para continuar com segurança.',false);
+  }
+  sb.auth.onAuthStateChange(function(event){if(event==='PASSWORD_RECOVERY')startRecovery();});
+  recovery.addEventListener('submit',async function(e){
+    e.preventDefault();
+    var password=document.getElementById('new-password').value;
+    if(password!==document.getElementById('repeat-password').value){
+      feedback('As senhas informadas não coincidem.',true);return;
+    }
+    var button=document.getElementById('recovery-save');button.disabled=true;
+    try{
+      var r=await sb.auth.updateUser({password:password});
+      if(r.error)throw r.error;
+      feedback('Senha alterada. Sua conta está pronta para entrar.',false);
+      setTimeout(function(){window.location.replace(redirect);},1100);
+    }catch(err){feedback(err.message||'Não foi possível alterar a senha.',true);}
+    finally{button.disabled=false;}
+  });
   form.addEventListener('submit',async function(e){
     e.preventDefault();btn.disabled=true;var email=document.getElementById('email').value.trim().toLowerCase(),password=document.getElementById('password').value;
     try{
