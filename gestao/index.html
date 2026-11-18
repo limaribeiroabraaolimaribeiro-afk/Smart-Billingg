@@ -148,6 +148,13 @@
   @media(max-width:640px){.crm-form-grid{grid-template-columns:1fr}.crm-form-grid .field.wide{grid-column:1}.crm-section-head{margin-bottom:var(--space-4)}#new-button{min-width:40px;padding:8px 10px;font-size:11.5px}.crm-module .toolbar{display:flex;flex-direction:column;align-items:stretch}.crm-module .filter{width:100%}.crm-module .meeting{flex-wrap:wrap}}
   @media(max-width:480px){.crm-stats{grid-template-columns:1fr}.crm-module .person-row,.crm-module .agenda-row{gap:8px}}
 
+  /* Evita duplicar o título no celular e remove margens somadas. */
+  .crm-module .page-section{gap:var(--space-4)}
+  .crm-module .crm-section-head{margin:0}
+  @media(max-width:640px){
+    .crm-module .crm-section-head .section-head__title{display:none}
+    .crm-module .crm-section-head .section-head__desc{margin-top:0}
+  }
   /* Agenda comercial: versão compacta, preservando cores/tokens do Smart Billing. */
   .crm-agenda-list{display:grid;gap:12px}
   .crm-agenda-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:17px;padding:18px;min-width:0;box-shadow:var(--shadow-sm)}
@@ -298,7 +305,7 @@
 (function () {
   'use strict';
   var sb = typeof SB_SUPABASE !== 'undefined' ? SB_SUPABASE.client : null;
-  var state = { page: 'overview', companyId: null, user: null, role: 'admin', consultantId: null, noteLeadId: null, reportMeetingId: null, search: '', status: '', editingId: null, formType: null, leads: [], sales: [], meetings: [], consultants: [], notes: [] };
+  var state = { page: 'overview', companyId: null, user: null, role: 'admin', consultantId: null, noteLeadId: null, reportMeetingId: null, search: '', status: '', editingId: null, formType: null, leads: [], sales: [], meetings: [], consultants: [], notes: [], noteDetails: [] };
   var pages = {
     overview: ['Visão geral', 'Acompanhe o funil, os resultados e as próximas reuniões.', 'Novo lead'],
     leads: ['Possíveis clientes', 'Cadastre oportunidades, acompanhe negociações e organize contatos.', 'Novo lead'],
@@ -423,10 +430,11 @@
       var reportButton=m.status==='cancelada'?'':'<button type="button" class="btn btn-primary" data-report-meeting="'+esc(m.id)+'">'+
         (m.status==='realizada'?(m.report_summary?'Editar relatório':'Preencher relatório'):'Finalizar reunião')+'</button>';
       var edit=btnEdit('meetings',m.id);
+      if(edit)edit=edit.replace('>Editar</button>','>Editar reunião</button>');
       return '<article class="crm-agenda-card"><header class="crm-agenda-head">'+
         '<div class="crm-agenda-date"><strong>'+esc(d.getDate())+'</strong><small>'+esc(dayLabel)+'</small></div>'+
         '<div class="crm-agenda-intro"><div class="crm-agenda-title"><h3>'+esc(m.title)+'</h3>'+chip(m.status)+'</div>'+
-        '<div class="crm-agenda-time">'+esc(date(m.starts_at))+' · '+esc(time)+' · '+esc(m.meeting_type)+'</div></div></header>'+
+        '<div class="crm-agenda-time">'+esc(d.toLocaleDateString('pt-BR'))+' · '+esc(time)+' · '+esc(m.meeting_type)+'</div></div></header>'+
         '<div class="crm-agenda-meta">'+
           (location?'<span>Local: '+esc(location)+'</span>':'')+
           '<span>Consultor: '+esc(owner)+'</span></div>'+
@@ -466,7 +474,7 @@
         res=await sb.rpc('crm_team_directory',{p_company_id:state.companyId});
       }else{
         res=await sb.from(k==='notes'?'crm_lead_notes':tables[k])
-          .select('*').eq('company_id',state.companyId);
+          .select(k==='notes'?'id,lead_id':'*').eq('company_id',state.companyId);
       }
       if(res.error)throw new Error('Erro ao carregar '+k+': '+res.error.message);
       return res.data||[];
@@ -707,7 +715,7 @@
     function renderNotes(){
     var l=lead(state.noteLeadId);
     el('note-title').textContent='Anotações · '+(l?.name||'Cliente');
-    var notes=state.notes.filter(function(n){return n.lead_id===state.noteLeadId;})
+    var notes=state.noteDetails.filter(function(n){return n.lead_id===state.noteLeadId;})
       .sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at);});
     el('note-timeline').innerHTML=notes.length?notes.map(function(n){
       return '<div class="crm-note-row"><div class="crm-note-info"><strong>'+
@@ -715,15 +723,34 @@
         '</strong><span>'+esc(dateTime(n.created_at))+'</span></div><p>'+esc(n.body)+'</p></div>';
     }).join(''):'<div class="empty">Nenhuma anotação registrada. Registre o primeiro contato.</div>';
   }
-  function openNotes(leadId){
+  async function openNotes(leadId){
     if(!lead(leadId))return;
     state.noteLeadId=leadId;
+    state.noteDetails=[];
     el('note-body').value='';
-    renderNotes();
+    el('note-timeline').textContent='Carregando histórico...';
     el('notes-overlay').classList.add('is-open');
     el('note-body').focus();
+    try{
+      var res=await sb.from('crm_lead_notes')
+        .select('id,lead_id,author_id,author_name,body,created_at')
+        .eq('company_id',state.companyId)
+        .eq('lead_id',leadId)
+        .order('created_at',{ascending:false});
+      if(res.error)throw res.error;
+      if(state.noteLeadId!==leadId)return;
+      state.noteDetails=res.data||[];
+      renderNotes();
+    }catch(err){
+      if(state.noteLeadId===leadId)
+        el('note-timeline').textContent='Não foi possível carregar anotações: '+(err.message||err);
+    }
   }
-  function closeNotes(){el('notes-overlay').classList.remove('is-open');state.noteLeadId=null;}
+  function closeNotes(){
+    el('notes-overlay').classList.remove('is-open');
+    state.noteLeadId=null;
+    state.noteDetails=[];
+  }
   el('close-notes').addEventListener('click',closeNotes);
   el('cancel-notes').addEventListener('click',closeNotes);
   el('notes-overlay').addEventListener('click',function(e){if(e.target===el('notes-overlay'))closeNotes();});
@@ -739,9 +766,11 @@
         author_id:state.user.id,body:body
       }).select('*').single();
       if(res.error)throw res.error;
-      state.notes.push(res.data);
+      state.notes.push({id:res.data.id,lead_id:res.data.lead_id});
+      state.noteDetails.push(res.data);
       el('note-body').value='';
-      renderNotes();render();
+      renderNotes();
+      refreshFilteredRecords();
     }catch(err){alert('Não foi possível registrar: '+(err.message||err));}
     finally{btn.disabled=false;}
   });
