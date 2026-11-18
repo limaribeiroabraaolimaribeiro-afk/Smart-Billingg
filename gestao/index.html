@@ -94,6 +94,13 @@
   .crm-form-grid .control{width:100%;padding:12px 14px;min-height:44px;border:1.5px solid var(--border-subtle);background:var(--bg-muted);border-radius:var(--radius-md);font-size:13px}
   .crm-form-grid .control:focus{outline:none;border-color:var(--blue-500);background:var(--bg-surface)}
   .crm-form-actions{display:flex;justify-content:flex-end;gap:var(--space-3);padding-top:var(--space-5);margin-top:var(--space-5);border-top:1px solid var(--border-subtle)}
+  .crm-note-row{padding:13px 0;border-bottom:1px solid var(--border-subtle)}
+  .crm-note-row:last-child{border-bottom:0}
+  .crm-note-row .crm-note-info{display:flex;justify-content:space-between;gap:10px;color:var(--text-muted);font-size:11px;margin-bottom:7px}
+  .crm-note-row p{font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text-primary)}
+  #note-timeline{max-height:320px;overflow:auto;margin:12px 0;border:1px solid var(--border-subtle);padding:12px;border-radius:var(--radius-md)}
+  .crm-notes-btn{font-weight:700;color:var(--violet-600);white-space:nowrap}
+  .crm-consultant-hint{font-size:11.5px;color:var(--text-muted);margin:12px 0}
   @media(max-width:1100px){.crm-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.crm-cards3{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media(max-width:780px){.crm-split{grid-template-columns:1fr}.crm-cards3{grid-template-columns:1fr}.crm-module .meeting{gap:10px;padding:14px}}
   @media(max-width:640px){.crm-form-grid{grid-template-columns:1fr}.crm-form-grid .field.wide{grid-column:1}.crm-section-head{margin-bottom:var(--space-4)}#new-button{min-width:40px;padding:8px 10px;font-size:11.5px}.crm-module .toolbar{display:flex;flex-direction:column;align-items:stretch}.crm-module .filter{width:100%}.crm-module .meeting{flex-wrap:wrap}}
@@ -157,6 +164,26 @@
     <form id="record-form"><div id="form-fields" class="crm-form-grid"></div><div class="crm-form-actions"><button type="button" class="btn btn-secondary" id="cancel-modal">Cancelar</button><button type="submit" class="btn btn-primary" id="save-button">Salvar</button></div></form>
   </div>
 </div>
+
+<div class="modal-overlay" id="notes-overlay" role="presentation">
+  <div class="modal crm-modal" role="dialog" aria-modal="true" aria-labelledby="note-title">
+    <div class="crm-modal-head">
+      <h2 id="note-title">Anotações do cliente</h2>
+      <button class="crm-close" id="close-notes" type="button" aria-label="Fechar">×</button>
+    </div>
+    <div id="note-timeline" aria-live="polite"></div>
+    <form id="note-form">
+      <div class="field">
+        <label for="note-body">Nova anotação / histórico de contato</label>
+        <textarea id="note-body" class="textarea" maxlength="5000" rows="4" required placeholder="Ex.: Conversei com o cliente, solicitou orçamento para sexta-feira."></textarea>
+      </div>
+      <div class="crm-form-actions">
+        <button type="button" class="btn btn-secondary" id="cancel-notes">Fechar</button>
+        <button type="submit" class="btn btn-primary" id="save-note">Registrar anotação</button>
+      </div>
+    </form>
+  </div>
+</div>
 <script src="../assets/js/icons.js"></script>
 <script src="../assets/js/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -165,7 +192,7 @@
 (function () {
   'use strict';
   var sb = typeof SB_SUPABASE !== 'undefined' ? SB_SUPABASE.client : null;
-  var state = { page: 'overview', companyId: null, user: null, search: '', status: '', editingId: null, formType: null, leads: [], sales: [], meetings: [], consultants: [] };
+  var state = { page: 'overview', companyId: null, user: null, role: 'admin', consultantId: null, noteLeadId: null, search: '', status: '', editingId: null, formType: null, leads: [], sales: [], meetings: [], consultants: [], notes: [] };
   var pages = {
     overview: ['Visão geral', 'Acompanhe o funil, os resultados e as próximas reuniões.', 'Novo lead'],
     leads: ['Possíveis clientes', 'Cadastre oportunidades, acompanhe negociações e organize contatos.', 'Novo lead'],
@@ -192,7 +219,7 @@
   function btnEdit(type,id){return '<button type="button" class="btn btn-sm tiny ghost" data-edit="'+esc(type)+'" data-id="'+esc(id)+'">Editar</button>';}
   function msgEmpty(text){return '<div class="empty">'+esc(text)+'</div>';}
   function buildRows(rows,fields){if(!rows.length)return '<div class="card">'+msgEmpty('Nenhum registro encontrado. Cadastre o primeiro para começar.')+'</div>';
-    return '<div class="table-wrap"><table><thead><tr>'+fields.map(function(f){return '<th>'+f[0]+'</th>';}).join('')+'<th>Ações</th></tr></thead><tbody>'+rows.map(function(r){return '<tr>'+fields.map(function(f){return '<td>'+f[1](r)+'</td>';}).join('')+'<td>'+btnEdit(state.page,r.id)+(state.page==='leads'?'<button type="button" class="btn btn-sm tiny ghost" data-sell="'+esc(r.id)+'">Registrar venda</button>':'')+'</td></tr>';}).join('')+'</tbody></table></div>';
+    return '<div class="table-wrap"><table><thead><tr>'+fields.map(function(f){return '<th>'+f[0]+'</th>';}).join('')+'<th>Ações</th></tr></thead><tbody>'+rows.map(function(r){return '<tr>'+fields.map(function(f){return '<td>'+f[1](r)+'</td>';}).join('')+'<td>'+btnEdit(state.page,r.id)+(state.page==='leads'?'<button type="button" class="btn btn-sm tiny ghost" data-sell="'+esc(r.id)+'">Registrar venda</button> <button type="button" class="btn btn-sm tiny ghost" data-note="'+esc(r.id)+'">Anotações ('+state.notes.filter(function(n){return n.lead_id===r.id;}).length+')</button>':'')+'</td></tr>';}).join('')+'</tbody></table></div>';
   }
   function sectionToolbar(types){
     return '<div class="toolbar"><input class="search" id="record-search" autocomplete="off" placeholder="Buscar por nome, serviço ou consultor..." value="'+esc(state.search)+'"><select class="filter" id="record-filter"><option value="">Todos os status</option>'+types.map(function(s){return '<option value="'+s+'" '+(state.status===s?'selected':'')+'>'+esc(statuses[s])+'</option>';}).join('')+'</select></div>';
@@ -237,22 +264,18 @@
     var info=pages[state.page];el('page-title').textContent=info[0];el('page-description').textContent=info[1];
     el('new-button-label').textContent=info[2];el('new-button').setAttribute('aria-label',info[2]);el('new-button').setAttribute('title',info[2]);el('section-title').textContent=info[0];
     el('section-hint').textContent=state.page==='overview'?'Oportunidades e performance em um único lugar':{leads:state.leads.length+' lead(s) cadastrado(s)',sales:state.sales.length+' venda(s) registrada(s)',meetings:state.meetings.length+' reunião(ões) cadastrada(s)',consultants:state.consultants.length+' consultor(es) cadastrado(s)'}[state.page];
-    document.querySelectorAll('[data-page]').forEach(function(btn){btn.classList.toggle('is-active',btn.dataset.page===state.page);});
+    document.querySelectorAll('[data-page]').forEach(function(btn){btn.classList.toggle('is-active',btn.dataset.page===state.page);btn.hidden=state.role==='consultant'&&btn.dataset.page==='consultants';});
     el('workspace').innerHTML=state.page==='overview'?renderOverview():state.page==='leads'?renderLeads():state.page==='sales'?renderSales():state.page==='meetings'?renderMeetings():renderConsultants();
   }
   function showError(message){
-    el('boot').innerHTML='<div class="crm-error"><h2>Não foi possível abrir a gestão</h2><p>'+esc(message)+'</p><a class="btn btn-primary" href="../login.html">Ir para o login</a></div>';
+    el('boot').innerHTML='<div class="crm-error"><h2>Não foi possível abrir a gestão</h2><p>'+esc(message)+'</p><a class="btn btn-primary" href="login.html">Ir para o login</a></div>';
     el('boot').hidden=false;el('shell').hidden=true;
   }
-  function signin(){
-    var u=new URL('../login.html',window.location.href);
-    u.searchParams.set('redirect','gestao/');
-    window.location.replace(u.href);
-  }
+  function signin(){window.location.replace(new URL('./login.html',window.location.href).href);}
   async function load(){
-    var kinds=['consultants','leads','sales','meetings'];
+    var kinds=['consultants','leads','sales','meetings','notes'];
     var results=await Promise.all(kinds.map(async function(k){
-      var query=sb.from(tables[k]).select('*').eq('company_id',state.companyId);
+      var query=sb.from(k==='notes'?'crm_lead_notes':tables[k]).select('*').eq('company_id',state.companyId);
       var res=await query;
       if(res.error)throw new Error('Erro ao carregar '+k+': '+res.error.message);
       return res.data||[];
@@ -265,7 +288,7 @@
   }
   var definitions={
     consultants:[
-      ['name','Nome do consultor','text',true],['email','E-mail','email'],['whatsapp','WhatsApp','tel'],['active','Consultor ativo','checkbox']
+      ['name','Nome do consultor','text',true],['email','E-mail de acesso','email',true],['whatsapp','WhatsApp','tel'],['active','Consultor ativo','checkbox']
     ],
     leads:[
       ['name','Nome do possível cliente','text',true],['company_name','Empresa','text'],['whatsapp','WhatsApp','tel'],['email','E-mail','email'],
@@ -309,7 +332,8 @@
     return '<div class="field'+(key==='notes'?' wide':'')+'">'+title+'<input class="control" id="f-'+key+'" name="'+key+'" type="'+type+'" value="'+esc(value)+'" '+(type==='number'?'min="'+(key==='amount'?'0.01':'0')+'" step="0.01"':'')+' '+(required?'required':'')+'></div>';
   }
   function openForm(type,id,preset){
-    var record=id?find(type,id):Object.assign({},preset||{});
+    if(type==='consultants'&&state.role!=='admin')return;
+    var record=id?find(type,id):Object.assign({consultant_id:state.role==='consultant'?state.consultantId:null},preset||{});
     if(!record)return;
     state.formType=type;state.editingId=id||null;
     var singular={leads:'lead',sales:'venda',meetings:'reunião',consultants:'consultor'}[type];
@@ -330,6 +354,7 @@
       if(value===''){payload[key]=null;return;}
       payload[key]=value;
     });
+    if(state.role==='consultant'&&state.formType!=='consultants')payload.consultant_id=state.consultantId;
     return payload;
   }
   async function saveRecord(ev){
@@ -348,16 +373,16 @@
     }catch(e){alert('Não foi possível salvar: '+(e.message||e));}
     finally{button.disabled=false;button.textContent='Salvar';}
   }
-  function changePage(page){state.page=page;state.search='';state.status='';render();}
+  function changePage(page){if(state.role==='consultant'&&page==='consultants')return;state.page=page;state.search='';state.status='';render();}
   document.querySelectorAll('[data-icon]').forEach(function(node){var icon=node.dataset.icon;node.innerHTML=SB_ICON[icon]||'';});
   function closeSidebar(){el('sb-sidebar').classList.remove('is-open');el('sb-sidebar-overlay').style.display='none';document.body.style.overflow='';}
   el('sb-menu-btn').addEventListener('click',function(){el('sb-sidebar').classList.add('is-open');el('sb-sidebar-overlay').style.display='block';document.body.style.overflow='hidden';});
   el('sb-sidebar-close').addEventListener('click',closeSidebar);
   el('sb-sidebar-overlay').addEventListener('click',closeSidebar);
-  el('crm-logout').addEventListener('click',async function(){await sb.auth.signOut();window.location.href='../login.html';});
+  el('crm-logout').addEventListener('click',async function(){await sb.auth.signOut();window.location.href='./login.html';});
   document.querySelectorAll('[data-page]').forEach(function(btn){btn.addEventListener('click',function(){changePage(btn.dataset.page);closeSidebar();});});
   el('new-button').addEventListener('click',function(){openForm(state.page==='overview'?'leads':state.page);});
-  el('workspace').addEventListener('click',function(e){var sell=e.target.closest('[data-sell]');if(sell){var l=find('leads',sell.dataset.sell);if(l)openForm('sales',null,{lead_id:l.id,consultant_id:l.consultant_id,customer_name:l.name,service:l.service,amount:l.estimated_value});return;}var btn=e.target.closest('[data-edit]');if(btn)openForm(btn.dataset.edit,btn.dataset.id);});
+  el('workspace').addEventListener('click',function(e){var notes=e.target.closest('[data-note]');if(notes){openNotes(notes.dataset.note);return;}var sell=e.target.closest('[data-sell]');if(sell){var l=find('leads',sell.dataset.sell);if(l)openForm('sales',null,{lead_id:l.id,consultant_id:l.consultant_id,customer_name:l.name,service:l.service,amount:l.estimated_value});return;}var btn=e.target.closest('[data-edit]');if(btn)openForm(btn.dataset.edit,btn.dataset.id);});
   el('workspace').addEventListener('input',function(e){
     if(e.target.id==='record-search'){var n=e.target.selectionStart;state.search=e.target.value;render();var input=el('record-search');input.focus();input.setSelectionRange(n,n);}
   });
@@ -367,19 +392,83 @@
   el('cancel-modal').addEventListener('click',closeForm);
   el('modal-overlay').addEventListener('click',function(e){if(e.target===el('modal-overlay'))closeForm();});
   document.addEventListener('keydown',function(e){if(e.key==='Escape')closeForm();});
+
+  function renderNotes(){
+    var l=lead(state.noteLeadId);
+    el('note-title').textContent='Anotações · '+(l?.name||'Cliente');
+    var notes=state.notes.filter(function(n){return n.lead_id===state.noteLeadId;})
+      .sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at);});
+    el('note-timeline').innerHTML=notes.length?notes.map(function(n){
+      return '<div class="crm-note-row"><div class="crm-note-info"><strong>'+
+        (n.author_id===state.user.id?'Você':'Equipe comercial')+
+        '</strong><span>'+esc(dateTime(n.created_at))+'</span></div><p>'+esc(n.body)+'</p></div>';
+    }).join(''):'<div class="empty">Nenhuma anotação registrada. Registre o primeiro contato.</div>';
+  }
+  function openNotes(leadId){
+    if(!lead(leadId))return;
+    state.noteLeadId=leadId;
+    el('note-body').value='';
+    renderNotes();
+    el('notes-overlay').classList.add('is-open');
+    el('note-body').focus();
+  }
+  function closeNotes(){el('notes-overlay').classList.remove('is-open');state.noteLeadId=null;}
+  el('close-notes').addEventListener('click',closeNotes);
+  el('cancel-notes').addEventListener('click',closeNotes);
+  el('notes-overlay').addEventListener('click',function(e){if(e.target===el('notes-overlay'))closeNotes();});
+  el('note-form').addEventListener('submit',async function(e){
+    e.preventDefault();
+    if(!state.noteLeadId)return;
+    var body=el('note-body').value.trim();
+    if(!body)return;
+    var btn=el('save-note');btn.disabled=true;
+    try{
+      var res=await sb.from('crm_lead_notes').insert({
+        company_id:state.companyId,lead_id:state.noteLeadId,
+        author_id:state.user.id,body:body
+      }).select('*').single();
+      if(res.error)throw res.error;
+      state.notes.push(res.data);
+      el('note-body').value='';
+      renderNotes();render();
+    }catch(err){alert('Não foi possível registrar: '+(err.message||err));}
+    finally{btn.disabled=false;}
+  });
   (async function start(){
     if(!sb){showError('Conexão com o Supabase indisponível.');return;}
     try{
       var auth=await sb.auth.getUser();
       if(auth.error||!auth.data.user){signin();return;}
       state.user=auth.data.user;
-      var member=await sb.from('company_members').select('company_id,role').eq('user_id',state.user.id).in('role',['owner','admin']).limit(1);
-      if(member.error)throw member.error;
-      if(!member.data||!member.data.length){showError('Este usuário não possui acesso de administrador à Gestão Comercial.');return;}
-      state.companyId=member.data[0].company_id;
+      // A nova conta de um consultor pode receber uma empresa própria por
+      // trigger do Smart Billing. Isso NÃO lhe dá acesso aos dados dev.abraao.
+      var membership=await sb.from('company_members')
+        .select('company_id,role,companies(name)')
+        .eq('user_id',state.user.id).in('role',['owner','admin']);
+      if(membership.error)throw membership.error;
+      var admin=(membership.data||[]).find(function(m){return (m.companies?.name||'').toLowerCase()==='dev.abraao';});
+      if(admin){
+        state.companyId=admin.company_id;
+        state.role='admin';
+      }else{
+        var linked=await sb.from('crm_consultants').select('id,company_id,name,email,active')
+          .eq('active',true).limit(1);
+        if(linked.error)throw linked.error;
+        if(!linked.data||!linked.data.length){
+          showError('Seu acesso ainda não está autorizado. Peça à administração para cadastrar seu e-mail na área Consultores. O e-mail deve estar confirmado.');
+          return;
+        }
+        state.companyId=linked.data[0].company_id;
+        state.consultantId=linked.data[0].id;
+        state.role='consultant';
+        var label=el('section-title');
+        if(label)label.textContent='Meu painel comercial';
+      }
       var c=await sb.from('companies').select('name').eq('id',state.companyId).maybeSingle();
-      el('company-name').textContent=c.data?.name||'Empresa';
-      var name=state.user.user_metadata?.name||state.user.email||'Administrador';
+      el('company-name').textContent=state.role==='consultant'?'Consultor comercial':(c.data?.name||'dev.abraao');
+      var name=state.role==='consultant'
+        ? (linked.data[0].name||state.user.email)
+        : (state.user.user_metadata?.name||state.user.email||'Administrador');
       el('user-name').textContent=name;
       el('user-avatar').textContent=name.trim().slice(0,2).toUpperCase();
       await load();
