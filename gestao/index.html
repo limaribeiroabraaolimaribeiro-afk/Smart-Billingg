@@ -258,7 +258,7 @@
   }
   function renderConsultants(){
     if(!state.consultants.length)return '<div class="card">'+msgEmpty('Nenhum consultor cadastrado. Adicione o primeiro para começar.')+'</div>';
-    return '<div class="crm-cards3">'+state.consultants.map(function(c){var list=state.sales.filter(function(s){return s.consultant_id===c.id&&s.status==='fechada';});var total=list.reduce(function(a,s){return a+Number(s.amount);},0);return '<div class="consultant"><div class="consultant-top"><div class="consultant-icon">'+esc(c.name.slice(0,1).toUpperCase())+'</div><div style="flex:1;min-width:0"><strong>'+esc(c.name)+'</strong><small>'+esc(c.email||c.whatsapp||'Sem contato')+'</small></div>'+chip(c.active?'ativo':'inativo')+'</div><div class="consultant-stats"><div><strong>'+list.length+'</strong><small>Vendas</small></div><div><strong>'+money(total)+'</strong><small>Faturamento registrado</small></div></div><div style="margin-top:12px;text-align:right">'+btnEdit('consultants',c.id)+'</div></div>';}).join('')+'</div>';
+    return '<p class="crm-consultant-hint">Para liberar um consultor, cadastre o e-mail que ele usará no login. Compartilhe a página <a href="./login.html" style="color:var(--violet-600);font-weight:700">Entrar na gestão</a>. Apenas usuários autorizados e com e-mail confirmado acessam os registros.</p><div class="crm-cards3">'+state.consultants.map(function(c){var list=state.sales.filter(function(s){return s.consultant_id===c.id&&s.status==='fechada';});var total=list.reduce(function(a,s){return a+Number(s.amount);},0);return '<div class="consultant"><div class="consultant-top"><div class="consultant-icon">'+esc(c.name.slice(0,1).toUpperCase())+'</div><div style="flex:1;min-width:0"><strong>'+esc(c.name)+'</strong><small>'+esc(c.email||c.whatsapp||'Sem contato')+'</small></div>'+chip(c.active?'ativo':'inativo')+'</div><div class="consultant-stats"><div><strong>'+list.length+'</strong><small>Vendas</small></div><div><strong>'+money(total)+'</strong><small>Faturamento registrado</small></div></div><div style="margin-top:12px;text-align:right">'+btnEdit('consultants',c.id)+'</div></div>';}).join('')+'</div>';
   }
   function render(){
     var info=pages[state.page];el('page-title').textContent=info[0];el('page-description').textContent=info[1];
@@ -400,7 +400,7 @@
       .sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at);});
     el('note-timeline').innerHTML=notes.length?notes.map(function(n){
       return '<div class="crm-note-row"><div class="crm-note-info"><strong>'+
-        (n.author_id===state.user.id?'Você':'Equipe comercial')+
+        (n.author_id===state.user.id?'Você · ':'')+esc(n.author_name||'Equipe comercial')+
         '</strong><span>'+esc(dateTime(n.created_at))+'</span></div><p>'+esc(n.body)+'</p></div>';
     }).join(''):'<div class="empty">Nenhuma anotação registrada. Registre o primeiro contato.</div>';
   }
