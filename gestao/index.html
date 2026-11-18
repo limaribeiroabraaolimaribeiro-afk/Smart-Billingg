@@ -147,6 +147,41 @@
   @media(max-width:780px){.crm-split{grid-template-columns:1fr}.crm-cards3{grid-template-columns:1fr}.crm-module .meeting{gap:10px;padding:14px}}
   @media(max-width:640px){.crm-form-grid{grid-template-columns:1fr}.crm-form-grid .field.wide{grid-column:1}.crm-section-head{margin-bottom:var(--space-4)}#new-button{min-width:40px;padding:8px 10px;font-size:11.5px}.crm-module .toolbar{display:flex;flex-direction:column;align-items:stretch}.crm-module .filter{width:100%}.crm-module .meeting{flex-wrap:wrap}}
   @media(max-width:480px){.crm-stats{grid-template-columns:1fr}.crm-module .person-row,.crm-module .agenda-row{gap:8px}}
+
+  /* Agenda comercial: versão compacta, preservando cores/tokens do Smart Billing. */
+  .crm-agenda-list{display:grid;gap:12px}
+  .crm-agenda-card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:17px;padding:18px;min-width:0;box-shadow:var(--shadow-sm)}
+  .crm-agenda-head{display:flex;align-items:center;gap:12px;min-width:0}
+  .crm-agenda-date{width:53px;height:57px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--gradient-brand-soft);border-radius:12px;color:var(--violet-600)}
+  .crm-agenda-date strong{font-size:22px;line-height:1.15;letter-spacing:-.6px}
+  .crm-agenda-date small{font-size:10px;text-transform:uppercase;font-weight:800;margin-top:3px}
+  .crm-agenda-intro{min-width:0;flex:1}
+  .crm-agenda-title{display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap}
+  .crm-agenda-title h3{font-size:15.5px;line-height:1.25;min-width:0;overflow-wrap:anywhere;margin:0}
+  .crm-agenda-title .badge{flex-shrink:0;white-space:nowrap}
+  .crm-agenda-time{font-size:12px;color:var(--text-secondary);line-height:1.4;margin-top:6px}
+  .crm-agenda-meta{display:flex;gap:7px 14px;flex-wrap:wrap;margin:13px 0 0;font-size:11.5px;color:var(--text-muted);line-height:1.5}
+  .crm-agenda-meta span{overflow-wrap:anywhere}
+  .crm-agenda-note{font-size:12px;color:var(--text-secondary);margin:9px 0 0;overflow-wrap:anywhere}
+  .crm-report-collapse{margin-top:14px;background:var(--bg-muted);border:1px solid var(--border-subtle);border-radius:12px;overflow:hidden;min-width:0}
+  .crm-report-collapse summary{display:flex;flex-direction:column;gap:6px;list-style:none;cursor:pointer;padding:13px 15px}
+  .crm-report-collapse summary::-webkit-details-marker{display:none}
+  .crm-report-caption{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--violet-600)}
+  .crm-report-teaser{font-size:12.5px;font-weight:650;color:var(--text-primary);line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+  .crm-report-collapse[open] .crm-report-teaser{display:none}
+  .crm-report-expand{font-size:11.5px;color:var(--violet-600);font-weight:700}
+  .crm-report-expand:after{content:"⌄";font-size:16px;margin-left:6px}
+  .crm-report-collapse[open] .crm-report-expand:after{content:"⌃"}
+  .crm-report-content{padding:0 15px 14px;border-top:1px solid var(--border-subtle)}
+  .crm-report-line{padding-top:12px}
+  .crm-report-line b{display:block;font-size:11.5px;color:var(--text-secondary);margin-bottom:5px}
+  .crm-report-line p{font-size:12.5px;line-height:1.6;color:var(--text-primary);white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+  .crm-report-timestamp{margin-top:13px;font-size:10.5px;color:var(--text-muted)}
+  .crm-agenda-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .crm-agenda-actions .btn{min-height:38px;font-size:12px;padding:8px 12px;white-space:normal}
+  .crm-agenda-actions .btn-primary{justify-content:center}
+  .crm-report-pending{font-size:11.5px;color:var(--text-muted);margin-top:12px}
+  @media(max-width:500px){.crm-agenda-card{padding:15px}.crm-agenda-head{gap:10px}.crm-agenda-date{width:47px;height:52px}.crm-agenda-actions .btn-primary{flex:1 1 150px}}
 </style>
 </head>
 <body>
@@ -353,39 +388,56 @@
     var list=filtered(state.sales,function(r){return [r.customer_name,r.service,consultant(r.consultant_id)].join(' ');});
     return sectionToolbar(['fechada','cancelada'])+buildRows(list,[['Cliente',function(r){return '<strong>'+esc(r.customer_name)+'</strong>';}],['Serviço',function(r){return esc(r.service);}],['Consultor',function(r){return esc(consultant(r.consultant_id));}],['Valor',function(r){return '<strong>'+money(r.amount)+'</strong>';}],['Data',function(r){return esc(date(r.sold_at));}],['Status',function(r){return chip(r.status);}]]);
   }
-  function renderMeetings(){
+  function renderMeetingList(){
     var list=filtered(state.meetings,function(r){
-      return [r.title,r.location,consultant(r.consultant_id),lead(r.lead_id)?.name||'',r.report_summary,r.report_items_needed,r.report_next_steps].join(' ');
+      return [r.title,r.location,consultant(r.consultant_id),lead(r.lead_id)?.name||'',
+        r.report_summary,r.report_items_needed,r.report_next_steps].join(' ');
     }).sort(function(a,b){return new Date(a.starts_at)-new Date(b.starts_at);});
-    var toolbar=sectionToolbar(['agendada','realizada','cancelada']);
-    if(!list.length)return toolbar+'<div class="card">'+msgEmpty('Nenhuma reunião encontrada. Cadastre um compromisso.')+'</div>';
-    return toolbar+list.map(function(m){
+    if(!list.length)return '<div class="card">'+msgEmpty('Nenhuma reunião encontrada. Cadastre um compromisso.')+'</div>';
+    return '<div class="crm-agenda-list">'+list.map(function(m){
       var d=new Date(m.starts_at);
+      var dayLabel=d.toLocaleDateString('pt-BR',{month:'short'}).replace('.','');
+      var time=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      var location=m.location||(lead(m.lead_id)?.name||'');
+      var owner=consultant(m.consultant_id);
       var report='';
       if(m.report_summary){
-        report='<section class="crm-meeting-report"><h4>Relatório da reunião</h4>'+
-          '<p><strong>O que foi conversado</strong>'+esc(m.report_summary)+'</p>'+
-          (m.report_items_needed?'<p><strong>O que precisamos pegar do cliente</strong>'+esc(m.report_items_needed)+'</p>':'')+
-          (m.report_next_steps?'<p><strong>Próximos passos</strong>'+esc(m.report_next_steps)+'</p>':'')+
-          (m.report_updated_at?'<p class="crm-report-date">Atualizado em '+esc(dateTime(m.report_updated_at))+'</p>':'')+
-          '</section>';
+        function part(label,value){
+          return value?'<div class="crm-report-line"><b>'+esc(label)+'</b><p>'+esc(value)+'</p></div>':'';
+        }
+        report='<details class="crm-report-collapse"><summary>'+
+          '<span class="crm-report-caption">Relatório da reunião</span>'+
+          '<span class="crm-report-teaser">'+esc(m.report_summary)+'</span>'+
+          '<span class="crm-report-expand">Ver detalhes</span></summary>'+
+          '<div class="crm-report-content">'+
+          part('O que foi conversado',m.report_summary)+
+          part('O que precisamos pegar do cliente',m.report_items_needed)+
+          part('Próximos passos',m.report_next_steps)+
+          (m.report_updated_at?'<div class="crm-report-timestamp">Atualizado em '+esc(dateTime(m.report_updated_at))+'</div>':'')+
+          '</div></details>';
       }
       var reportButton=m.status==='cancelada'?'':'<button type="button" class="btn btn-primary" data-report-meeting="'+esc(m.id)+'">'+
-        (m.status==='realizada'?(m.report_summary?'Ver / editar relatório':'Preencher relatório'):'Finalizar reunião')+'</button>';
-      return '<article class="meeting crm-meeting-card">'+
-        '<div class="date-chip"><strong>'+esc(d.getDate())+'</strong><small>'+esc(d.toLocaleDateString('pt-BR',{month:'short'}))+'</small></div>'+
-        '<div class="meeting-main">'+
-          '<div class="crm-meeting-heading"><h3>'+esc(m.title)+'</h3>'+chip(m.status)+'</div>'+
-          '<p>'+esc(dateTime(m.starts_at))+' · '+esc(m.meeting_type)+' · '+esc(consultant(m.consultant_id))+'</p>'+
-          '<p>'+esc(m.location||(lead(m.lead_id)?.name||'Sem local informado'))+'</p>'+
-          (m.notes?'<p>'+esc(m.notes)+'</p>':'')+
-          report+
-          (m.status==='realizada'&&!m.report_summary?'<p class="crm-report-date">Relatório pendente de preenchimento.</p>':'')+
-          '<div class="crm-meeting-actions">'+reportButton+btnEdit('meetings',m.id)+'</div>'+
-        '</div></article>';
-    }).join('');
+        (m.status==='realizada'?(m.report_summary?'Editar relatório':'Preencher relatório'):'Finalizar reunião')+'</button>';
+      var edit=btnEdit('meetings',m.id);
+      return '<article class="crm-agenda-card"><header class="crm-agenda-head">'+
+        '<div class="crm-agenda-date"><strong>'+esc(d.getDate())+'</strong><small>'+esc(dayLabel)+'</small></div>'+
+        '<div class="crm-agenda-intro"><div class="crm-agenda-title"><h3>'+esc(m.title)+'</h3>'+chip(m.status)+'</div>'+
+        '<div class="crm-agenda-time">'+esc(date(m.starts_at))+' · '+esc(time)+' · '+esc(m.meeting_type)+'</div></div></header>'+
+        '<div class="crm-agenda-meta">'+
+          (location?'<span>Local: '+esc(location)+'</span>':'')+
+          '<span>Consultor: '+esc(owner)+'</span></div>'+
+        (m.notes?'<p class="crm-agenda-note">'+esc(m.notes)+'</p>':'')+
+        report+
+        (m.status==='realizada'&&!m.report_summary?'<p class="crm-report-pending">Relatório ainda não preenchido.</p>':'')+
+        (reportButton||edit?'<footer class="crm-agenda-actions">'+reportButton+edit+'</footer>':'')+
+        '</article>';
+    }).join('')+'</div>';
   }
-    function renderConsultants(){
+  function renderMeetings(){
+    return sectionToolbar(['agendada','realizada','cancelada'])+
+      '<div id="crm-records">'+renderMeetingList()+'</div>';
+  }
+  function renderConsultants(){
     if(!state.consultants.length)return '<div class="card">'+msgEmpty('Nenhum consultor cadastrado. Adicione o primeiro para começar.')+'</div>';
     return '<p class="crm-consultant-hint">Cadastre o e-mail do consultor e use <strong>Copiar convite</strong> para enviar o link individual. Depois de vinculado, ele entrará normalmente com a própria conta. A administração vê todos os registros.</p><div class="crm-cards3">'+state.consultants.map(function(c){var list=state.sales.filter(function(s){return s.consultant_id===c.id&&s.status==='fechada';});var total=list.reduce(function(a,s){return a+Number(s.amount);},0);return '<div class="consultant"><div class="consultant-top"><div class="consultant-icon">'+esc(c.name.slice(0,1).toUpperCase())+'</div><div style="flex:1;min-width:0"><strong>'+esc(c.name)+'</strong><small>'+esc(c.email||c.whatsapp||'Sem contato')+'</small></div>'+chip(c.active?'ativo':'inativo')+'</div><div class="consultant-stats"><div><strong>'+list.length+'</strong><small>Vendas</small></div><div><strong>'+money(total)+'</strong><small>Faturamento registrado</small></div></div><div style="margin-top:12px;text-align:right">'+btnEdit('consultants',c.id)+(c.auth_user_id?'<span class="badge badge-paid" style="margin-left:6px">Acesso vinculado</span>':'<button type="button" class="btn btn-sm tiny ghost" data-invite="'+esc(c.id)+'">Copiar convite</button>')+'</div></div>';}).join('')+'</div>';
   }
