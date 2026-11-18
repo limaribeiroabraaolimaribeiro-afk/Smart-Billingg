@@ -81,7 +81,7 @@
 <script>
 (function () {
   'use strict';
-  var sb = window.SB_SUPABASE && window.SB_SUPABASE.client;
+  var sb = typeof SB_SUPABASE !== 'undefined' ? SB_SUPABASE.client : null;
   var state = { page: 'overview', companyId: null, user: null, search: '', status: '', editingId: null, formType: null, leads: [], sales: [], meetings: [], consultants: [] };
   var pages = {
     overview: ['Visão geral', 'Acompanhe o funil, os resultados e as próximas reuniões.', 'Novo lead'],
