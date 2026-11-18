@@ -115,6 +115,26 @@
   .crm-consultant-hint{font-size:11.5px;color:var(--text-muted);margin:12px 0}
   .crm-lead-hint{grid-column:1/-1;color:var(--text-secondary);background:var(--bg-muted);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:13px 15px;font-size:12px;line-height:1.55}
   .crm-optional-tag{color:var(--text-muted);font-weight:500;font-size:11px}
+  .crm-meeting-card .meeting-main{min-width:0}
+  .crm-meeting-heading{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px}
+  .crm-meeting-heading h3{margin:0}
+  .crm-meeting-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:15px}
+  .crm-meeting-actions .btn{font-size:12px;min-height:38px;white-space:normal}
+  .crm-meeting-report{background:var(--bg-muted);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:14px;margin-top:13px}
+  .crm-meeting-report h4{font-size:12px;font-weight:800;margin:0 0 10px;color:var(--text-primary)}
+  .crm-meeting-report p{margin:9px 0 0;font-size:12px;white-space:pre-line;overflow-wrap:anywhere;color:var(--text-primary);line-height:1.55}
+  .crm-meeting-report p strong{display:block;font-size:11px;color:var(--text-secondary);margin-bottom:3px}
+  .crm-meeting-report .crm-report-date{font-size:10.5px;color:var(--text-muted);margin-top:10px}
+  .crm-report-context{color:var(--text-secondary);font-size:12px;margin-bottom:18px}
+  .crm-report-form{display:flex;flex-direction:column;gap:15px}
+  .crm-report-form textarea{width:100%;min-height:100px;resize:vertical;padding:12px 14px;border:1.5px solid var(--border-subtle);border-radius:var(--radius-md);background:var(--bg-muted);font:inherit;font-size:13px;line-height:1.55}
+  .crm-report-form textarea:focus{outline:none;border-color:var(--blue-500);background:var(--bg-surface)}
+  .crm-report-form .field-hint{margin-top:5px;display:block;font-size:11px;color:var(--text-muted)}
+  .crm-report-message{padding:12px;background:var(--red-100);color:var(--red-700);border-radius:var(--radius-md);font-size:12px}
+  @media(max-width:520px){
+    .crm-meeting-card{gap:10px}
+    .crm-meeting-actions .btn{flex:1}
+  }
   @media(max-width:1100px){.crm-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.crm-cards3{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media(max-width:780px){.crm-split{grid-template-columns:1fr}.crm-cards3{grid-template-columns:1fr}.crm-module .meeting{gap:10px;padding:14px}}
   @media(max-width:640px){.crm-form-grid{grid-template-columns:1fr}.crm-form-grid .field.wide{grid-column:1}.crm-section-head{margin-bottom:var(--space-4)}#new-button{min-width:40px;padding:8px 10px;font-size:11.5px}.crm-module .toolbar{display:flex;flex-direction:column;align-items:stretch}.crm-module .filter{width:100%}.crm-module .meeting{flex-wrap:wrap}}
@@ -198,6 +218,35 @@
     </form>
   </div>
 </div>
+<div class="modal-overlay" id="meeting-report-overlay" role="presentation">
+  <div class="modal crm-modal" role="dialog" aria-modal="true" aria-labelledby="meeting-report-title">
+    <div class="crm-modal-head">
+      <h2 id="meeting-report-title">Finalizar reunião</h2>
+      <button class="crm-close" id="close-meeting-report" type="button" aria-label="Fechar">×</button>
+    </div>
+    <p class="crm-report-context" id="meeting-report-context"></p>
+    <form id="meeting-report-form" class="crm-report-form">
+      <div class="field">
+        <label for="meeting-report-summary">O que foi conversado na reunião? *</label>
+        <textarea id="meeting-report-summary" name="report_summary" rows="5" maxlength="6000" required placeholder="Resuma a conversa, necessidades do cliente e decisões tomadas."></textarea>
+      </div>
+      <div class="field">
+        <label for="meeting-report-items">O que precisamos pegar ou solicitar do cliente?</label>
+        <textarea id="meeting-report-items" name="report_items_needed" rows="4" maxlength="4000" placeholder="Um item por linha: logotipo, fotos, informações, documentos, preços..."></textarea>
+        <span class="field-hint">Anote os materiais e informações que ainda precisam ser recebidos. Se não houver, deixe em branco.</span>
+      </div>
+      <div class="field">
+        <label for="meeting-report-next">Próximos passos e responsabilidades</label>
+        <textarea id="meeting-report-next" name="report_next_steps" rows="4" maxlength="4000" placeholder="Ex.: preparar proposta, enviar orçamento, retornar na sexta-feira."></textarea>
+      </div>
+      <p id="meeting-report-message" class="crm-report-message" hidden role="alert"></p>
+      <div class="crm-form-actions">
+        <button type="button" class="btn btn-secondary" id="cancel-meeting-report">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="save-meeting-report">Finalizar e salvar relatório</button>
+      </div>
+    </form>
+  </div>
+</div>
 <script src="../assets/js/icons.js"></script>
 <script src="../assets/js/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -206,7 +255,7 @@
 (function () {
   'use strict';
   var sb = typeof SB_SUPABASE !== 'undefined' ? SB_SUPABASE.client : null;
-  var state = { page: 'overview', companyId: null, user: null, role: 'admin', consultantId: null, noteLeadId: null, search: '', status: '', editingId: null, formType: null, leads: [], sales: [], meetings: [], consultants: [], notes: [] };
+  var state = { page: 'overview', companyId: null, user: null, role: 'admin', consultantId: null, noteLeadId: null, reportMeetingId: null, search: '', status: '', editingId: null, formType: null, leads: [], sales: [], meetings: [], consultants: [], notes: [] };
   var pages = {
     overview: ['Visão geral', 'Acompanhe o funil, os resultados e as próximas reuniões.', 'Novo lead'],
     leads: ['Possíveis clientes', 'Cadastre oportunidades, acompanhe negociações e organize contatos.', 'Novo lead'],
@@ -297,11 +346,37 @@
     return sectionToolbar(['fechada','cancelada'])+buildRows(list,[['Cliente',function(r){return '<strong>'+esc(r.customer_name)+'</strong>';}],['Serviço',function(r){return esc(r.service);}],['Consultor',function(r){return esc(consultant(r.consultant_id));}],['Valor',function(r){return '<strong>'+money(r.amount)+'</strong>';}],['Data',function(r){return esc(date(r.sold_at));}],['Status',function(r){return chip(r.status);}]]);
   }
   function renderMeetings(){
-    var list=filtered(state.meetings,function(r){return [r.title,r.location,consultant(r.consultant_id),lead(r.lead_id)?.name||''].join(' ');}).sort(function(a,b){return new Date(a.starts_at)-new Date(b.starts_at);});
-    if(!list.length)return sectionToolbar(['agendada','realizada','cancelada'])+'<div class="card">'+msgEmpty('Nenhuma reunião encontrada. Cadastre um compromisso.')+'</div>';
-    return sectionToolbar(['agendada','realizada','cancelada'])+list.map(function(m){var d=new Date(m.starts_at);return '<div class="meeting"><div class="date-chip"><strong>'+esc(d.getDate())+'</strong><small>'+esc(d.toLocaleDateString('pt-BR',{month:'short'}))+'</small></div><div class="meeting-main"><h3>'+esc(m.title)+'</h3><p>'+esc(dateTime(m.starts_at))+' · '+esc(m.meeting_type)+' · '+esc(consultant(m.consultant_id))+'</p><p>'+esc(m.location||(lead(m.lead_id)?.name||'Sem local informado'))+'</p><p>'+esc(m.notes||'')+'</p></div><div>'+chip(m.status)+'<div style="margin-top:8px">'+btnEdit('meetings',m.id)+'</div></div></div>';}).join('');
+    var list=filtered(state.meetings,function(r){
+      return [r.title,r.location,consultant(r.consultant_id),lead(r.lead_id)?.name||'',r.report_summary,r.report_items_needed,r.report_next_steps].join(' ');
+    }).sort(function(a,b){return new Date(a.starts_at)-new Date(b.starts_at);});
+    var toolbar=sectionToolbar(['agendada','realizada','cancelada']);
+    if(!list.length)return toolbar+'<div class="card">'+msgEmpty('Nenhuma reunião encontrada. Cadastre um compromisso.')+'</div>';
+    return toolbar+list.map(function(m){
+      var d=new Date(m.starts_at);
+      var report='';
+      if(m.report_summary){
+        report='<section class="crm-meeting-report"><h4>Relatório da reunião</h4>'+
+          '<p><strong>O que foi conversado</strong>'+esc(m.report_summary)+'</p>'+
+          (m.report_items_needed?'<p><strong>O que precisamos pegar do cliente</strong>'+esc(m.report_items_needed)+'</p>':'')+
+          (m.report_next_steps?'<p><strong>Próximos passos</strong>'+esc(m.report_next_steps)+'</p>':'')+
+          (m.report_updated_at?'<p class="crm-report-date">Atualizado em '+esc(dateTime(m.report_updated_at))+'</p>':'')+
+          '</section>';
+      }
+      var reportButton=m.status==='cancelada'?'':'<button type="button" class="btn btn-primary" data-report-meeting="'+esc(m.id)+'">'+
+        (m.status==='realizada'?(m.report_summary?'Ver / editar relatório':'Preencher relatório'):'Finalizar reunião')+'</button>';
+      return '<article class="meeting crm-meeting-card">'+
+        '<div class="date-chip"><strong>'+esc(d.getDate())+'</strong><small>'+esc(d.toLocaleDateString('pt-BR',{month:'short'}))+'</small></div>'+
+        '<div class="meeting-main">'+
+          '<div class="crm-meeting-heading"><h3>'+esc(m.title)+'</h3>'+chip(m.status)+'</div>'+
+          '<p>'+esc(dateTime(m.starts_at))+' · '+esc(m.meeting_type)+' · '+esc(consultant(m.consultant_id))+'</p>'+
+          '<p>'+esc(m.location||(lead(m.lead_id)?.name||'Sem local informado'))+'</p>'+
+          (m.notes?'<p>'+esc(m.notes)+'</p>':'')+
+          report+
+          '<div class="crm-meeting-actions">'+reportButton+btnEdit('meetings',m.id)+'</div>'+
+        '</div></article>';
+    }).join('');
   }
-  function renderConsultants(){
+    function renderConsultants(){
     if(!state.consultants.length)return '<div class="card">'+msgEmpty('Nenhum consultor cadastrado. Adicione o primeiro para começar.')+'</div>';
     return '<p class="crm-consultant-hint">Cadastre o e-mail do consultor e use <strong>Copiar convite</strong> para enviar o link individual. Depois de vinculado, ele entrará normalmente com a própria conta. A administração vê todos os registros.</p><div class="crm-cards3">'+state.consultants.map(function(c){var list=state.sales.filter(function(s){return s.consultant_id===c.id&&s.status==='fechada';});var total=list.reduce(function(a,s){return a+Number(s.amount);},0);return '<div class="consultant"><div class="consultant-top"><div class="consultant-icon">'+esc(c.name.slice(0,1).toUpperCase())+'</div><div style="flex:1;min-width:0"><strong>'+esc(c.name)+'</strong><small>'+esc(c.email||c.whatsapp||'Sem contato')+'</small></div>'+chip(c.active?'ativo':'inativo')+'</div><div class="consultant-stats"><div><strong>'+list.length+'</strong><small>Vendas</small></div><div><strong>'+money(total)+'</strong><small>Faturamento registrado</small></div></div><div style="margin-top:12px;text-align:right">'+btnEdit('consultants',c.id)+(c.auth_user_id?'<span class="badge badge-paid" style="margin-left:6px">Acesso vinculado</span>':'<button type="button" class="btn btn-sm tiny ghost" data-invite="'+esc(c.id)+'">Copiar convite</button>')+'</div></div>';}).join('')+'</div>';
   }
@@ -449,6 +524,8 @@
   document.querySelectorAll('[data-page]').forEach(function(btn){btn.addEventListener('click',function(){changePage(btn.dataset.page);closeSidebar();});});
   el('new-button').addEventListener('click',function(){openForm(state.page==='overview'?'leads':state.page);});
   el('workspace').addEventListener('click',async function(e){
+    var meetingReport=e.target.closest('[data-report-meeting]');
+    if(meetingReport){openMeetingReport(meetingReport.dataset.reportMeeting);return;}
     var invite=e.target.closest('[data-invite]');
     if(invite){
       var c=find('consultants',invite.dataset.invite);
@@ -473,7 +550,71 @@
   el('modal-overlay').addEventListener('click',function(e){if(e.target===el('modal-overlay'))closeForm();});
   document.addEventListener('keydown',function(e){if(e.key==='Escape')closeForm();});
 
-  function renderNotes(){
+  function openMeetingReport(meetingId){
+    var meeting=find('meetings',meetingId);
+    if(!meeting||meeting.status==='cancelada')return;
+    state.reportMeetingId=meetingId;
+    el('meeting-report-title').textContent=meeting.status==='realizada'?'Relatório da reunião':'Finalizar reunião';
+    el('meeting-report-context').textContent=meeting.title+' · '+dateTime(meeting.starts_at);
+    el('meeting-report-summary').value=meeting.report_summary||'';
+    el('meeting-report-items').value=meeting.report_items_needed||'';
+    el('meeting-report-next').value=meeting.report_next_steps||'';
+    el('save-meeting-report').textContent=meeting.status==='realizada'?'Salvar relatório':'Finalizar e salvar relatório';
+    el('meeting-report-message').hidden=true;
+    el('meeting-report-overlay').classList.add('is-open');
+    el('meeting-report-summary').focus();
+  }
+  function closeMeetingReport(){
+    el('meeting-report-overlay').classList.remove('is-open');
+    state.reportMeetingId=null;
+  }
+  el('close-meeting-report').addEventListener('click',closeMeetingReport);
+  el('cancel-meeting-report').addEventListener('click',closeMeetingReport);
+  el('meeting-report-overlay').addEventListener('click',function(e){
+    if(e.target===el('meeting-report-overlay'))closeMeetingReport();
+  });
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')closeMeetingReport();});
+  el('meeting-report-form').addEventListener('submit',async function(e){
+    e.preventDefault();
+    var meetingId=state.reportMeetingId;
+    if(!meetingId)return;
+    var summary=el('meeting-report-summary').value.trim();
+    if(!summary){el('meeting-report-summary').focus();return;}
+    var items=el('meeting-report-items').value.trim();
+    var next=el('meeting-report-next').value.trim();
+    var button=el('save-meeting-report'),notice=el('meeting-report-message');
+    button.disabled=true;
+    notice.hidden=true;
+    try{
+      var result=await sb.rpc('crm_finish_meeting',{
+        p_meeting_id:meetingId,
+        p_report_summary:summary,
+        p_items_needed:items||null,
+        p_next_steps:next||null
+      });
+      if(result.error)throw result.error;
+      // Atualiza o registro local imediatamente, depois sincroniza com Supabase.
+      var current=find('meetings',meetingId);
+      if(current){
+        current.status='realizada';
+        current.report_summary=summary;
+        current.report_items_needed=items||null;
+        current.report_next_steps=next||null;
+        current.report_updated_at=new Date().toISOString();
+      }
+      closeMeetingReport();
+      render();
+      try{await load();}
+      catch(err){alert('Relatório salvo, mas houve erro ao atualizar a lista. Recarregue a página.');}
+    }catch(err){
+      notice.textContent='Não foi possível salvar o relatório: '+(err.message||err);
+      notice.hidden=false;
+    }finally{
+      button.disabled=false;
+    }
+  });
+
+    function renderNotes(){
     var l=lead(state.noteLeadId);
     el('note-title').textContent='Anotações · '+(l?.name||'Cliente');
     var notes=state.notes.filter(function(n){return n.lead_id===state.noteLeadId;})
