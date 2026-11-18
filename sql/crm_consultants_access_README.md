@@ -1,0 +1,6 @@
+-- Controle de acesso à Gestão Comercial: mesmo Supabase do Smart Billingg.
+-- Tabelas financeiras não recebem novas permissões.
+-- Apenas usuários autenticados com e-mail confirmado e aprovado como consultor
+-- recebem acesso a seus próprios registros, além dos owners/admins da empresa.
+-- Esta migração foi aplicada ao projeto uhdmjgycsyvetrjhwcpy em 2026-11-18.
+-- Consulte o histórico de migrações Supabase: crm_consultants_login_scope_and_notes.
