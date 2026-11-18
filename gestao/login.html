@@ -36,7 +36,7 @@
     <p>Acesso da equipe dev.abraao. Faça login para registrar contatos, vendas, reuniões e anotações.</p>
     <div class="crm-tabs" role="tablist">
       <button type="button" data-tab="login" class="active">Entrar</button>
-      <button type="button" data-tab="signup">Primeiro acesso</button>
+      <button type="button" data-tab="signup" hidden>Primeiro acesso</button>
     </div>
     <div id="feedback" class="crm-message" hidden role="status"></div>
     <form id="crm-login-form" class="crm-panel">
@@ -48,8 +48,9 @@
       <button id="forgot" type="button">Esqueci minha senha</button>
     </div>
     <div id="first-access-hint" class="crm-footer" hidden>
-      É necessário que a administração cadastre seu e-mail como consultor antes do acesso aos dados.
+      Use o mesmo e-mail autorizado no convite. Após confirmar o e-mail, o acesso será vinculado à sua conta.
     </div>
+    <p class="crm-footer" id="invite-help">Para criar um acesso, peça à administração seu link individual de convite.</p>
   </div>
 </main>
 <script src="../assets/js/config.js"></script>
@@ -61,6 +62,18 @@
   var sb=typeof SB_SUPABASE!=='undefined'?SB_SUPABASE.client:null;
   var tab='login',form=document.getElementById('crm-login-form'),message=document.getElementById('feedback'),btn=document.getElementById('submit');
   var redirect=new URL('./',window.location.href).href;
+  var invitation=new URLSearchParams(window.location.search).get('convite')||'';
+  var withInvite=new URL('./login.html',window.location.href);
+  if(invitation)withInvite.searchParams.set('convite',invitation);
+  document.querySelector('[data-tab="signup"]').hidden=!invitation;
+  document.getElementById('invite-help').textContent=invitation
+    ? 'Convite recebido. Entre com uma conta existente ou use Primeiro acesso.'
+    : 'Para criar um acesso, peça à administração seu link individual de convite.';
+  async function claimInvite(){
+    if(!invitation)return;
+    var response=await sb.rpc('crm_claim_invite',{p_token:invitation});
+    if(response.error)throw response.error;
+  }
   function feedback(text,isError){message.hidden=false;message.textContent=text;message.className='crm-message'+(isError?' error':'');}
   function setTab(next){
     tab=next;document.querySelectorAll('[data-tab]').forEach(function(b){b.classList.toggle('active',b.dataset.tab===next);});
@@ -76,17 +89,28 @@
     e.preventDefault();btn.disabled=true;var email=document.getElementById('email').value.trim().toLowerCase(),password=document.getElementById('password').value;
     try{
       if(tab==='signup'){
-        var r=await sb.auth.signUp({email:email,password:password,options:{emailRedirectTo:redirect}});
+        var r=await sb.auth.signUp({email:email,password:password,options:{emailRedirectTo:withInvite.href}});
         if(r.error)throw r.error;
         if(!r.data.session){feedback('Cadastro solicitado. Confirme seu e-mail e faça login. O acesso à gestão só será liberado quando a administração cadastrar seu e-mail como consultor.',false);return;}
-        window.location.replace(redirect);return;
+        await claimInvite();window.location.replace(redirect);return;
       }
       var res=await sb.auth.signInWithPassword({email:email,password:password});
       if(res.error)throw res.error;
+      await claimInvite();
       window.location.replace(redirect);
     }catch(err){feedback(err.message||'Não foi possível autenticar.',true);}
     finally{btn.disabled=false;}
   });
+  // After e-mail confirmation Supabase may return directly with an active session.
+  // Claim the one-time invitation before opening the management dashboard.
+  if(invitation){
+    sb.auth.getUser().then(async function(res){
+      if(res.data?.user){
+        try{await claimInvite();window.location.replace(redirect);}
+        catch(err){feedback(err.message||'Não foi possível ativar o convite. Verifique seu e-mail.',true);}
+      }
+    }).catch(function(){/* A página de login continua acessível. */});
+  }
   document.getElementById('forgot').addEventListener('click',async function(){
     var email=document.getElementById('email').value.trim();
     if(!email){feedback('Digite seu e-mail acima para recuperar a senha.',true);return;}
