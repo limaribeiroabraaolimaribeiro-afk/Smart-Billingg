@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Entrar · Gestão Comercial</title>
+<link rel="icon" type="image/svg+xml" href="../assets/img/logo.svg">
+<link rel="stylesheet" href="../assets/css/variables.css">
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/components.css">
+<link rel="stylesheet" href="../assets/css/pages.css">
+<style>
+[hidden]{display:none!important}
+.crm-auth{min-height:100vh;padding:26px 14px;display:flex;align-items:center;justify-content:center;background:var(--bg-app)}
+.crm-login{max-width:460px;width:100%;padding:32px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg)}
+.crm-logo{max-width:165px;max-height:54px;object-fit:contain;margin:0 auto 22px}
+.crm-login h1{font-size:22px;font-weight:800;text-align:center;margin:0 0 8px}
+.crm-login p{font-size:13px;line-height:1.55;color:var(--text-secondary);text-align:center;margin:0 0 22px}
+.crm-tabs{display:flex;background:var(--bg-muted);border-radius:var(--radius-md);padding:4px;margin:0 0 20px;gap:4px}
+.crm-tabs button{flex:1;padding:11px 8px;border-radius:var(--radius-sm);font-size:12px;font-weight:700;color:var(--text-secondary)}
+.crm-tabs button.active{background:var(--bg-surface);color:var(--violet-600);box-shadow:var(--shadow-sm)}
+.crm-panel{display:grid;gap:15px}
+.crm-panel .field{gap:7px}
+.crm-message{margin:0 0 16px;padding:12px 14px;border-radius:var(--radius-sm);font-size:12px;line-height:1.5;background:var(--blue-100);color:var(--blue-700)}
+.crm-message.error{background:var(--red-100);color:var(--red-700)}
+.crm-footer{margin-top:17px;text-align:center;color:var(--text-muted);font-size:11px}
+.crm-footer button{font-size:12px;font-weight:700;color:var(--violet-600)}
+</style>
+</head>
+<body>
+<main class="crm-auth">
+  <div class="crm-login">
+    <img class="crm-logo" src="../assets/img/logo.png" alt="Smart Billing">
+    <h1>Gestão Comercial</h1>
+    <p>Acesso da equipe dev.abraao. Faça login para registrar contatos, vendas, reuniões e anotações.</p>
+    <div class="crm-tabs" role="tablist">
+      <button type="button" data-tab="login" class="active">Entrar</button>
+      <button type="button" data-tab="signup">Primeiro acesso</button>
+    </div>
+    <div id="feedback" class="crm-message" hidden role="status"></div>
+    <form id="crm-login-form" class="crm-panel">
+      <div class="field"><label for="email">E-mail de acesso</label><input class="input" id="email" type="email" autocomplete="email" required placeholder="seuemail@dominio.com"></div>
+      <div class="field"><label for="password">Senha</label><input class="input" id="password" type="password" autocomplete="current-password" required minlength="6" placeholder="Sua senha"></div>
+      <button type="submit" class="btn btn-primary btn-block" id="submit">Entrar na gestão</button>
+    </form>
+    <div class="crm-footer">
+      <button id="forgot" type="button">Esqueci minha senha</button>
+    </div>
+    <div id="first-access-hint" class="crm-footer" hidden>
+      É necessário que a administração cadastre seu e-mail como consultor antes do acesso aos dados.
+    </div>
+  </div>
+</main>
+<script src="../assets/js/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/js/supabase-client.js"></script>
+<script>
+(function(){
+  'use strict';
+  var sb=typeof SB_SUPABASE!=='undefined'?SB_SUPABASE.client:null;
+  var tab='login',form=document.getElementById('crm-login-form'),message=document.getElementById('feedback'),btn=document.getElementById('submit');
+  var redirect=new URL('./',window.location.href).href;
+  function feedback(text,isError){message.hidden=false;message.textContent=text;message.className='crm-message'+(isError?' error':'');}
+  function setTab(next){
+    tab=next;document.querySelectorAll('[data-tab]').forEach(function(b){b.classList.toggle('active',b.dataset.tab===next);});
+    btn.textContent=next==='login'?'Entrar na gestão':'Criar meu acesso';
+    document.getElementById('forgot').hidden=next!=='login';
+    document.getElementById('first-access-hint').hidden=next==='login';
+    document.getElementById('password').autocomplete=next==='login'?'current-password':'new-password';
+    message.hidden=true;
+  }
+  document.querySelectorAll('[data-tab]').forEach(function(b){b.addEventListener('click',function(){setTab(b.dataset.tab);});});
+  if(!sb){feedback('Não foi possível carregar a autenticação. Atualize a página.',true);btn.disabled=true;return;}
+  form.addEventListener('submit',async function(e){
+    e.preventDefault();btn.disabled=true;var email=document.getElementById('email').value.trim().toLowerCase(),password=document.getElementById('password').value;
+    try{
+      if(tab==='signup'){
+        var r=await sb.auth.signUp({email:email,password:password,options:{emailRedirectTo:redirect}});
+        if(r.error)throw r.error;
+        if(!r.data.session){feedback('Cadastro solicitado. Confirme seu e-mail e faça login. O acesso à gestão só será liberado quando a administração cadastrar seu e-mail como consultor.',false);return;}
+        window.location.replace(redirect);return;
+      }
+      var res=await sb.auth.signInWithPassword({email:email,password:password});
+      if(res.error)throw res.error;
+      window.location.replace(redirect);
+    }catch(err){feedback(err.message||'Não foi possível autenticar.',true);}
+    finally{btn.disabled=false;}
+  });
+  document.getElementById('forgot').addEventListener('click',async function(){
+    var email=document.getElementById('email').value.trim();
+    if(!email){feedback('Digite seu e-mail acima para recuperar a senha.',true);return;}
+    var r=await sb.auth.resetPasswordForEmail(email,{redirectTo:new URL('./login.html',window.location.href).href});
+    feedback(r.error?r.error.message:'Se o e-mail estiver cadastrado, você receberá instruções para recuperar a senha.',Boolean(r.error));
+  });
+})();
+</script>
+</body>
+</html>
