@@ -264,7 +264,7 @@
     consultants: ['Consultores', 'Acompanhe a equipe comercial e seus resultados.', 'Novo consultor']
   };
   var tables = { leads: 'crm_leads', sales: 'crm_sales', meetings: 'crm_meetings', consultants: 'crm_consultants' };
-  var statuses = { novo:'Novo', contato:'Em contato', proposta:'Proposta', negociacao:'Negociação', ganho:'Ganho', perdido:'Perdido', fechada:'Fechada', cancelada:'Cancelada', agendada:'Agendada', realizada:'Realizada' };
+  var statuses = { novo:'Novo', contato:'Em contato', proposta:'Proposta', negociacao:'Negociação', ganho:'Ganho', perdido:'Perdido', fechada:'Fechada', cancelada:'Cancelada', agendada:'Agendada', realizada:'Finalizada' };
   function el(id){ return document.getElementById(id); }
   function esc(value){ return String(value == null ? '' : value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   function money(x){ return (Number(x)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
@@ -372,6 +372,7 @@
           '<p>'+esc(m.location||(lead(m.lead_id)?.name||'Sem local informado'))+'</p>'+
           (m.notes?'<p>'+esc(m.notes)+'</p>':'')+
           report+
+          (m.status==='realizada'&&!m.report_summary?'<p class="crm-report-date">Relatório pendente de preenchimento.</p>':'')+
           '<div class="crm-meeting-actions">'+reportButton+btnEdit('meetings',m.id)+'</div>'+
         '</div></article>';
     }).join('');
