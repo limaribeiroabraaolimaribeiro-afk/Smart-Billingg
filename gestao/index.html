@@ -1,80 +1,154 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex,nofollow">
-  <title>Gestão Comercial · Smart Billingg</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root{--ink:#171a1f;--muted:#777b85;--line:#eae6df;--cream:#f9f6f0;--white:#fff;--orange:#f57432;--orange-soft:#fff0e6;--sidebar:#18191d;--green:#19865b;--shadow:0 10px 35px rgba(36,31,25,.055)}
-    [hidden]{display:none!important}*{box-sizing:border-box}html{font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--cream)}
-    body{margin:0}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}a{color:inherit;text-decoration:none}
-    .shell{display:flex;min-height:100vh}.sidebar{width:236px;background:var(--sidebar);color:white;padding:28px 16px;display:flex;flex-direction:column;position:fixed;inset:0 auto 0 0;z-index:10}
-    .brand{display:flex;align-items:center;gap:12px;padding:5px 11px 32px}.brand-icon{width:34px;height:34px;display:grid;place-items:center;background:var(--orange);color:#fff;border-radius:11px;font-weight:800;font-size:20px;transform:rotate(-6deg)}.brand strong{font-size:15px;letter-spacing:-.5px}.brand small{font-size:10px;color:#c6c4c1;display:block;margin-top:3px;letter-spacing:1px;text-transform:uppercase}
-    .nav{display:flex;flex-direction:column;gap:5px}.nav button{border:0;background:transparent;color:#a9aab0;text-align:left;padding:13px 13px;border-radius:11px;font-size:13px;font-weight:650;display:flex;gap:11px;align-items:center;transition:.15s}
-    .nav button.active,.nav button:hover{background:#303036;color:#fff}.nav button.active{box-shadow:inset 3px 0 var(--orange)}
-    .nav-icon{width:18px;font-size:17px;text-align:center;font-weight:600}.side-bottom{margin-top:auto;padding:14px 11px;border-top:1px solid #303038;font-size:11px;color:#999}
-    .main{margin-left:236px;flex:1;min-width:0}.topbar{padding:25px 34px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:#fff;gap:12px}
-    .eyebrow{font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange);margin-bottom:6px}
-    h1{font-size:24px;letter-spacing:-.9px;margin:0;font-weight:800}.subtitle{font-size:12px;color:var(--muted);margin:6px 0 0}
-    .top-right{display:flex;align-items:center;gap:13px}.avatar{width:36px;height:36px;background:var(--ink);color:#fff;border-radius:11px;display:grid;place-items:center;font-size:13px;font-weight:800}.identity{font-size:12px;line-height:1.5}.identity strong{display:block}.identity span{color:var(--muted)}
-    .workspace{max-width:1490px;padding:30px 34px 80px;margin:auto}.section-title{font-size:18px;letter-spacing:-.5px;font-weight:800;margin:30px 0 15px}
-    .heading-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
-    .btn{border:1px solid var(--line);border-radius:10px;padding:11px 15px;background:#fff;color:var(--ink);font-size:12px;font-weight:750;display:inline-flex;align-items:center;gap:8px;justify-content:center;white-space:nowrap}
-    .btn:hover{background:#f6f3ee}.btn.primary{background:var(--orange);color:#fff;border-color:var(--orange)}.btn.primary:hover{background:#e26020}.btn.tiny{padding:7px 10px;font-size:11px}.btn.ghost{border-color:transparent;background:transparent;color:var(--orange)}.btn.ghost:hover{background:var(--orange-soft)}
-    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px}.stat{background:#fff;border:1px solid var(--line);border-radius:17px;padding:22px;box-shadow:var(--shadow);min-width:0}.stat-label{font-size:12px;color:var(--muted);font-weight:650}.stat-value{font-size:29px;font-weight:800;letter-spacing:-1px;margin:16px 0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.stat-foot{font-size:11px;color:#888}.stat-mark{width:32px;height:5px;border-radius:3px;background:var(--orange)}
-    .split{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-top:19px}.card{background:#fff;border:1px solid var(--line);border-radius:17px;box-shadow:var(--shadow);padding:20px;min-width:0}
-    .card-title{font-weight:800;font-size:14px;letter-spacing:-.2px;margin:0 0 18px}.muted{color:var(--muted)}.empty{padding:30px 15px;text-align:center;color:var(--muted);font-size:13px}
-    .stage{display:flex;align-items:center;gap:12px;margin:15px 0;font-size:12px}.stage-name{width:94px;color:#555}.stage-track{flex:1;height:9px;background:#f3f0ec;border-radius:99px;overflow:hidden}.stage-fill{height:100%;border-radius:99px;background:var(--orange)}.stage-count{font-weight:800;width:24px;text-align:right}
-    .person-row,.agenda-row{display:flex;justify-content:space-between;align-items:center;gap:14px;border-bottom:1px solid var(--line);padding:13px 2px}.person-row:last-child,.agenda-row:last-child{border:0}.person-row strong,.agenda-row strong{font-size:12px;display:block}.person-row small,.agenda-row small{display:block;color:var(--muted);font-size:11px;margin-top:5px}.value{font-weight:800;font-size:13px;white-space:nowrap}
-    .toolbar{display:flex;justify-content:space-between;gap:10px;margin:0 0 17px}.toolbar .search{flex:1;max-width:440px}.search,.filter,.control{border:1px solid #dedbd6;background:#fff;outline:none;padding:11px 13px;border-radius:10px;color:#2d2e33;font-size:12px;min-width:0;width:100%}.search:focus,.filter:focus,.control:focus{border-color:var(--orange);box-shadow:0 0 0 3px #f574321a}.filter{width:auto;min-width:165px}
-    .table-wrap{background:#fff;border:1px solid var(--line);border-radius:16px;overflow-x:auto;box-shadow:var(--shadow)}
-    table{border-collapse:collapse;width:100%;min-width:780px;text-align:left}th{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#85848b;font-weight:800;background:#fbfaf7}th,td{padding:17px 16px;border-bottom:1px solid #f0eee9}td{font-size:12px}tr:last-child td{border:0}td strong{font-size:12px}td small{display:block;color:var(--muted);margin-top:4px;font-size:11px}td a{color:#d65e29;font-weight:700}
-    .pill{font-size:10px;font-weight:800;display:inline-block;padding:6px 9px;border-radius:30px;background:#f4f1ec;color:#555;white-space:nowrap}.pill.ganho,.pill.fechada,.pill.realizada{background:#e2f5e9;color:#14794d}.pill.perdido,.pill.cancelada{background:#ffebeb;color:#b34848}.pill.proposta,.pill.negociacao,.pill.agendada{background:#fff0de;color:#b86922}.pill.novo,.pill.contato{background:#eaf2ff;color:#4674a8}
-    .cards3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.consultant{padding:20px;background:#fff;border:1px solid var(--line);border-radius:16px}.consultant-top{display:flex;gap:11px;align-items:center}.consultant-icon{width:42px;height:42px;border-radius:13px;background:var(--orange-soft);color:#bd4d1b;display:grid;place-items:center;font-size:15px;font-weight:800}
-    .consultant strong{font-size:13px}.consultant small{font-size:11px;color:var(--muted);display:block;margin-top:4px;overflow-wrap:anywhere}.consultant-stats{margin-top:18px;display:flex;gap:15px;padding-top:15px;border-top:1px solid var(--line)}.consultant-stats div{flex:1}.consultant-stats strong{display:block;font-size:16px}.consultant-stats small{font-size:10px}
-    .meeting{display:flex;gap:14px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:15px;padding:18px;margin-bottom:12px}.date-chip{min-width:60px;background:var(--orange-soft);color:#a64e28;border-radius:11px;padding:12px 7px;text-align:center}.date-chip strong{display:block;font-size:21px}.date-chip small{font-size:10px;font-weight:800;text-transform:uppercase}.meeting-main{flex:1}.meeting-main h3{font-size:14px;margin:0 0 6px}.meeting-main p{font-size:11px;margin:5px 0;color:var(--muted)}
-    .modal-overlay{position:fixed;inset:0;background:#151515a8;z-index:100;display:none;align-items:center;justify-content:center;padding:20px}.modal-overlay.open{display:flex}.modal{width:min(700px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:18px;padding:26px;box-shadow:0 22px 90px #0003}.modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:22px}.modal-head h2{margin:0;font-size:19px;letter-spacing:-.5px}
-    .x{border:0;background:#f4f2ed;border-radius:9px;width:34px;height:34px;font-weight:800;color:#555}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}.field{min-width:0}.field.wide{grid-column:1/-1}.field label{display:block;font-weight:700;font-size:11px;margin-bottom:7px;color:#4a4b50}.field textarea{resize:vertical;min-height:75px}.form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px;border-top:1px solid var(--line);padding-top:20px}
-    .notice{background:#fff3e9;color:#a54d22;border:1px solid #ffdfc4;border-radius:12px;padding:14px;font-size:12px;margin:0 0 18px}
-    .loading{min-height:100vh;display:grid;place-items:center;font-size:13px;color:#6e6e75}.error-page{max-width:540px;margin:15vh auto;padding:30px;background:white;border-radius:16px;text-align:center}.error-page h2{margin-top:0}.error-page p{color:var(--muted);line-height:1.6}
-    @media(max-width:1100px){.stats{grid-template-columns:repeat(2,1fr)}.cards3{grid-template-columns:repeat(2,1fr)}}@media(max-width:780px){.shell{display:block}.sidebar{position:static;inset:auto;width:100%;padding:12px}.brand{padding:5px 7px 12px}.side-bottom{display:none}.nav{flex-direction:row;overflow-x:auto;gap:3px}.nav button{white-space:nowrap;flex:0 0 auto;padding:10px;font-size:11px}.nav-icon{display:none}.main{margin-left:0}.topbar{padding:20px 18px}h1{font-size:21px}.workspace{padding:20px 15px 60px}.split{grid-template-columns:1fr}.cards3{grid-template-columns:1fr}.identity{display:none}}@media(max-width:460px){.stats{grid-template-columns:1fr 1fr;gap:10px}.stat{padding:15px}.stat-value{font-size:21px}.stat-label{font-size:10px}.toolbar{flex-direction:column}.filter,.search{max-width:none!important;width:100%}.form-grid{grid-template-columns:1fr}.field.wide{grid-column:1}.heading-row{align-items:flex-start}.btn{padding:10px;font-size:11px}}
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Gestão Comercial · Smart Billing</title>
+<link rel="icon" type="image/svg+xml" href="../assets/img/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/variables.css">
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/layout.css">
+<link rel="stylesheet" href="../assets/css/components.css">
+<link rel="stylesheet" href="../assets/css/pages.css">
+<style>
+  /* Apenas adaptações locais: todos os tokens, componentes e layout são do Smart Billing. */
+  [hidden]{display:none!important}
+  .crm-loading{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;color:var(--text-secondary);font-size:13px}
+  .crm-error{max-width:550px;margin:auto;background:var(--bg-surface);padding:var(--space-8);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);text-align:center}
+  .crm-error h2{font-size:20px;margin:0 0 12px}.crm-error p{line-height:1.6;color:var(--text-secondary);margin:0 0 20px}
+  .crm-side-action{width:100%;text-align:left}
+  .crm-side-action .sidebar-link__icon{flex-shrink:0}
+  .crm-topbar-breadcrumb{font-size:12px}
+  #new-button{gap:8px}
+  .crm-module{min-width:0}
+  .crm-section-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:var(--space-6)}
+  .crm-section-head .section-head__title{font-size:16px}
+  .crm-section-head .section-head__desc{margin-top:4px}
+  .crm-stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .crm-split{display:grid;grid-template-columns:1.3fr 1fr;gap:var(--space-5);margin-top:var(--space-5)}
+  .crm-module .card{padding:var(--space-5)}
+  .crm-module .card-title{font-size:15.5px;font-weight:800;margin:0 0 18px;color:var(--text-primary)}
+  .crm-module .muted{color:var(--text-muted)}
+  .crm-module .empty{padding:var(--space-8) var(--space-4);text-align:center;color:var(--text-muted);font-size:13px}
+  .crm-module .stage{display:flex;align-items:center;gap:var(--space-3);margin:17px 0;font-size:12.5px}
+  .crm-module .stage-name{width:100px;flex-shrink:0;color:var(--text-secondary);font-weight:600}
+  .crm-module .stage-track{flex:1;height:10px;background:var(--bg-muted);border-radius:var(--radius-pill);overflow:hidden}
+  .crm-module .stage-fill{height:100%;background:var(--gradient-brand);border-radius:var(--radius-pill)}
+  .crm-module .stage-count{font-weight:800;width:25px;text-align:right}
+  .crm-module .person-row,.crm-module .agenda-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border-subtle)}
+  .crm-module .person-row:last-child,.crm-module .agenda-row:last-child{border:0}
+  .crm-module .person-row strong,.crm-module .agenda-row strong{font-size:13px;display:block}
+  .crm-module .person-row small,.crm-module .agenda-row small{display:block;color:var(--text-muted);font-size:11.5px;margin-top:5px}
+  .crm-module .value{font-size:13px;font-weight:800;white-space:nowrap}
+  .crm-module .toolbar{margin-bottom:var(--space-4)}
+  .crm-module .search{width:100%;background:var(--bg-muted);border:1.5px solid var(--border-subtle);border-radius:var(--radius-md);padding:11px 14px;font-size:13px;min-height:42px}
+  .crm-module .search:focus{outline:none;border-color:var(--blue-500);background:var(--bg-surface)}
+  .crm-module .filter{padding:11px 14px;min-height:42px;min-width:175px;border-radius:var(--radius-md);border:1.5px solid var(--border-subtle);background:var(--bg-muted);font-size:12.5px}
+  .crm-module .table-wrap{overflow-x:auto;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)}
+  .crm-module .table-wrap table{width:100%;min-width:780px;border-collapse:collapse}
+  .crm-module .table-wrap th{padding:16px;text-align:left;border-bottom:1px solid var(--border-subtle);color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+  .crm-module .table-wrap td{padding:16px;border-bottom:1px solid var(--border-subtle);font-size:13px;vertical-align:middle}
+  .crm-module .table-wrap tr:last-child td{border-bottom:0}
+  .crm-module .table-wrap tbody tr:hover{background:var(--bg-muted)}
+  .crm-module .table-wrap td strong{font-size:13px}
+  .crm-module .table-wrap td small{font-size:11.5px;color:var(--text-muted);display:block;margin-top:4px}
+  .crm-module .table-wrap td a{font-weight:700;color:var(--blue-600)}
+  .crm-module .btn.tiny{font-size:12px;min-height:34px;padding:6px 10px}
+  .crm-module .btn.ghost{color:var(--violet-600);background:transparent}
+  .crm-module .btn.ghost:hover{background:var(--gradient-brand-soft)}
+  .crm-cards3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-5)}
+  .crm-module .consultant{background:var(--bg-surface);padding:var(--space-5);border-radius:var(--radius-lg);border:1px solid var(--border-subtle);box-shadow:var(--shadow-sm)}
+  .crm-module .consultant-top{display:flex;align-items:center;gap:12px}
+  .crm-module .consultant-icon{width:42px;height:42px;border-radius:var(--radius-md);background:var(--gradient-brand);color:white;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;flex-shrink:0}
+  .crm-module .consultant strong{font-size:13px}
+  .crm-module .consultant small{font-size:11.5px;color:var(--text-muted);display:block;margin-top:4px;overflow-wrap:anywhere}
+  .crm-module .consultant-stats{margin-top:18px;padding-top:16px;border-top:1px solid var(--border-subtle);display:flex;gap:14px}
+  .crm-module .consultant-stats div{flex:1}.crm-module .consultant-stats strong{font-size:16px;display:block}.crm-module .consultant-stats small{font-size:11px}
+  .crm-module .meeting{display:flex;gap:var(--space-4);align-items:flex-start;padding:var(--space-5);background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);margin-bottom:var(--space-3)}
+  .crm-module .date-chip{min-width:58px;text-align:center;background:var(--gradient-brand-soft);color:var(--violet-600);padding:11px 8px;border-radius:var(--radius-md)}
+  .crm-module .date-chip strong{display:block;font-size:22px}.crm-module .date-chip small{font-size:10px;text-transform:uppercase;font-weight:800}
+  .crm-module .meeting-main{flex:1;min-width:0}
+  .crm-module .meeting-main h3{font-size:14px;margin:0 0 7px}
+  .crm-module .meeting-main p{font-size:12px;color:var(--text-muted);margin:5px 0;overflow-wrap:anywhere}
+  .crm-modal{width:100%;max-width:690px;max-height:92vh;overflow-y:auto;display:block}
+  .crm-modal-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:var(--space-5)}
+  .crm-modal-head h2{font-size:19px;font-weight:800}
+  .crm-close{width:35px;height:35px;flex-shrink:0;border-radius:var(--radius-sm);background:var(--bg-muted);color:var(--text-secondary);font-size:20px}
+  .crm-close:hover{background:var(--border-subtle)}
+  .crm-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)}
+  .crm-form-grid .field.wide{grid-column:1/-1}
+  .crm-form-grid .field textarea{min-height:85px;resize:vertical}
+  .crm-form-grid .control{width:100%;padding:12px 14px;min-height:44px;border:1.5px solid var(--border-subtle);background:var(--bg-muted);border-radius:var(--radius-md);font-size:13px}
+  .crm-form-grid .control:focus{outline:none;border-color:var(--blue-500);background:var(--bg-surface)}
+  .crm-form-actions{display:flex;justify-content:flex-end;gap:var(--space-3);padding-top:var(--space-5);margin-top:var(--space-5);border-top:1px solid var(--border-subtle)}
+  @media(max-width:1100px){.crm-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.crm-cards3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:780px){.crm-split{grid-template-columns:1fr}.crm-cards3{grid-template-columns:1fr}.crm-module .meeting{gap:10px;padding:14px}}
+  @media(max-width:640px){.crm-form-grid{grid-template-columns:1fr}.crm-form-grid .field.wide{grid-column:1}.crm-section-head{margin-bottom:var(--space-4)}#new-button{min-width:40px;padding:8px 10px;font-size:11.5px}.crm-module .toolbar{display:flex;flex-direction:column;align-items:stretch}.crm-module .filter{width:100%}.crm-module .meeting{flex-wrap:wrap}}
+  @media(max-width:480px){.crm-stats{grid-template-columns:1fr}.crm-module .person-row,.crm-module .agenda-row{gap:8px}}
+</style>
 </head>
 <body>
-<div id="boot" class="loading">Verificando acesso à Gestão Comercial…</div>
-<div id="shell" class="shell" hidden>
-  <aside class="sidebar">
-    <div class="brand"><div class="brand-icon">◆</div><div><strong>Gestão Comercial</strong><small>Smart Billingg · interno</small></div></div>
-    <nav class="nav" aria-label="Gestão Comercial">
-      <button data-page="overview" class="active"><span class="nav-icon">▦</span>Visão geral</button>
-      <button data-page="leads"><span class="nav-icon">◈</span>Possíveis clientes</button>
-      <button data-page="sales"><span class="nav-icon">↗</span>Vendas</button>
-      <button data-page="meetings"><span class="nav-icon">▤</span>Agenda</button>
-      <button data-page="consultants"><span class="nav-icon">♙</span>Consultores</button>
+<div id="boot" class="crm-loading" role="status">Verificando acesso à Gestão Comercial…</div>
+<div id="shell" class="app-shell" hidden>
+  <aside class="sidebar" id="sb-sidebar">
+    <div class="sidebar-brand">
+      <img class="sidebar-brand__wordmark" src="../assets/img/logo.png" alt="Smart Billing">
+      <button type="button" class="topbar-menu-btn sidebar-close" id="sb-sidebar-close" aria-label="Fechar menu" style="margin-left:auto;color:rgba(255,255,255,.7)">×</button>
+    </div>
+    <div class="sidebar-tagline">Gestão Comercial · Acesso interno</div>
+    <nav class="sidebar-nav" aria-label="Gestão Comercial">
+      <button type="button" class="sidebar-link crm-side-action is-active" data-page="overview"><span class="sidebar-link__icon" data-icon="dashboard"></span>Visão geral</button>
+      <button type="button" class="sidebar-link crm-side-action" data-page="leads"><span class="sidebar-link__icon" data-icon="users"></span>Possíveis clientes</button>
+      <button type="button" class="sidebar-link crm-side-action" data-page="sales"><span class="sidebar-link__icon" data-icon="chart"></span>Vendas</button>
+      <button type="button" class="sidebar-link crm-side-action" data-page="meetings"><span class="sidebar-link__icon" data-icon="calendar"></span>Agenda de reuniões</button>
+      <button type="button" class="sidebar-link crm-side-action" data-page="consultants"><span class="sidebar-link__icon" data-icon="shield"></span>Consultores</button>
     </nav>
-    <div class="side-bottom">Área interna independente<br>Dados protegidos por permissões do Supabase</div>
+    <div class="sidebar-footer">
+      <button type="button" class="sidebar-logout" id="crm-logout"><span class="sidebar-link__icon" data-icon="logout"></span>Sair da conta</button>
+    </div>
   </aside>
-  <div class="main">
+  <div class="sidebar-overlay" id="sb-sidebar-overlay"></div>
+  <div class="app-main">
     <header class="topbar">
-      <div><div class="eyebrow" id="eyebrow">Painel comercial</div><h1 id="page-title">Visão geral</h1><p class="subtitle" id="page-description">Acompanhe o funil, os resultados e as próximas reuniões.</p></div>
-      <div class="top-right"><div class="identity"><strong id="user-name">Administrador</strong><span id="company-name">Carregando empresa</span></div><div class="avatar" id="user-avatar">GC</div></div>
+      <div class="topbar-left">
+        <button type="button" class="topbar-menu-btn" id="sb-menu-btn" aria-label="Abrir menu"><span data-icon="menu"></span></button>
+        <div class="topbar-title-group">
+          <h1 class="topbar-title" id="page-title">Visão geral</h1>
+          <div class="topbar-breadcrumb crm-topbar-breadcrumb" id="page-description">Painel de gestão comercial</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button type="button" class="btn btn-primary" id="new-button">+ Novo lead</button>
+        <div class="topbar-user">
+          <span class="avatar" id="user-avatar">GC</span>
+          <span class="topbar-user__meta">
+            <span class="topbar-user__name" id="user-name">Administrador</span>
+            <span class="topbar-user__role" id="company-name">Gestão Comercial</span>
+          </span>
+        </div>
+      </div>
     </header>
-    <main class="workspace">
-      <div class="heading-row"><div id="section-hint" class="muted" style="font-size:12px"></div><button class="btn primary" id="new-button">+ Novo lead</button></div>
-      <div id="workspace" aria-live="polite"></div>
+    <main class="app-content crm-module" id="crm-app-content">
+      <div class="page-section">
+        <div class="crm-section-head section-head">
+          <div><h2 class="section-head__title" id="section-title">Painel comercial</h2><p class="section-head__desc" id="section-hint"></p></div>
+        </div>
+        <div id="workspace" aria-live="polite"></div>
+      </div>
     </main>
   </div>
 </div>
 <div class="modal-overlay" id="modal-overlay" role="presentation">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div class="modal-head"><h2 id="modal-title">Novo cadastro</h2><button class="x" id="close-modal" type="button" aria-label="Fechar">×</button></div>
-    <form id="record-form"><div id="form-fields" class="form-grid"></div><div class="form-actions"><button type="button" class="btn" id="cancel-modal">Cancelar</button><button type="submit" class="btn primary" id="save-button">Salvar</button></div></form>
+  <div class="modal crm-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="crm-modal-head"><h2 id="modal-title">Novo cadastro</h2><button class="crm-close" id="close-modal" type="button" aria-label="Fechar">×</button></div>
+    <form id="record-form"><div id="form-fields" class="crm-form-grid"></div><div class="crm-form-actions"><button type="button" class="btn btn-secondary" id="cancel-modal">Cancelar</button><button type="submit" class="btn btn-primary" id="save-button">Salvar</button></div></form>
   </div>
 </div>
+<script src="../assets/js/icons.js"></script>
 <script src="../assets/js/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../assets/js/supabase-client.js"></script>
@@ -103,19 +177,20 @@
   function find(type,id){return state[type].find(function(x){return x.id===id;});}
   function consultant(id){var p=find('consultants',id);return p ? p.name : 'Não atribuído';}
   function lead(id){return find('leads',id);}
-  function chip(status){return '<span class="pill '+esc(status)+'">'+esc(statuses[status]||status)+'</span>';}
+  function chip(status){var kind=({ganho:'paid',fechada:'paid',realizada:'paid',ativo:'paid',perdido:'overdue',cancelada:'overdue',inativo:'canceled',proposta:'pending',negociacao:'pending',agendada:'pending',novo:'review',contato:'review'})[status]||'canceled';return '<span class="badge badge-'+kind+'">'+esc(statuses[status]||status)+'</span>';}
   function phoneHref(phone){var digits=String(phone||'').replace(/\D/g,'');if(!digits)return '';return 'https://wa.me/'+(digits.length<=11?'55':'')+digits;}
   function whatsapp(phone){return phone ? '<a href="'+esc(phoneHref(phone))+'" target="_blank" rel="noopener noreferrer">WhatsApp</a>' : '—';}
-  function btnEdit(type,id){return '<button type="button" class="btn tiny ghost" data-edit="'+esc(type)+'" data-id="'+esc(id)+'">Editar</button>';}
+  function btnEdit(type,id){return '<button type="button" class="btn btn-sm tiny ghost" data-edit="'+esc(type)+'" data-id="'+esc(id)+'">Editar</button>';}
   function msgEmpty(text){return '<div class="empty">'+esc(text)+'</div>';}
   function buildRows(rows,fields){if(!rows.length)return '<div class="card">'+msgEmpty('Nenhum registro encontrado. Cadastre o primeiro para começar.')+'</div>';
-    return '<div class="table-wrap"><table><thead><tr>'+fields.map(function(f){return '<th>'+f[0]+'</th>';}).join('')+'<th>Ações</th></tr></thead><tbody>'+rows.map(function(r){return '<tr>'+fields.map(function(f){return '<td>'+f[1](r)+'</td>';}).join('')+'<td>'+btnEdit(state.page,r.id)+(state.page==='leads'?'<button type="button" class="btn tiny ghost" data-sell="'+esc(r.id)+'">Registrar venda</button>':'')+'</td></tr>';}).join('')+'</tbody></table></div>';
+    return '<div class="table-wrap"><table><thead><tr>'+fields.map(function(f){return '<th>'+f[0]+'</th>';}).join('')+'<th>Ações</th></tr></thead><tbody>'+rows.map(function(r){return '<tr>'+fields.map(function(f){return '<td>'+f[1](r)+'</td>';}).join('')+'<td>'+btnEdit(state.page,r.id)+(state.page==='leads'?'<button type="button" class="btn btn-sm tiny ghost" data-sell="'+esc(r.id)+'">Registrar venda</button>':'')+'</td></tr>';}).join('')+'</tbody></table></div>';
   }
   function sectionToolbar(types){
     return '<div class="toolbar"><input class="search" id="record-search" autocomplete="off" placeholder="Buscar por nome, serviço ou consultor..." value="'+esc(state.search)+'"><select class="filter" id="record-filter"><option value="">Todos os status</option>'+types.map(function(s){return '<option value="'+s+'" '+(state.status===s?'selected':'')+'>'+esc(statuses[s])+'</option>';}).join('')+'</select></div>';
   }
   function filtered(rows,queryFields){return rows.filter(function(r){var match=!state.search||queryFields(r).toLowerCase().includes(trim(state.search));return match&&(!state.status||r.status===state.status);});}
-  function stat(label,value,foot){return '<div class="stat"><div class="stat-label">'+esc(label)+'</div><div class="stat-value">'+esc(value)+'</div><div class="stat-foot">'+esc(foot)+'</div><div class="stat-mark" style="margin-top:16px"></div></div>';}
+  function stat(label,value,foot){return '<div class="stat-card"><div class="stat-card__top"><span class="stat-card__icon stat-card__icon--brand">'+SB_ICON.chart+'</span></div><div><div class="stat-card__label">'+esc(label)+'</div><div class="stat-card__value">'+esc(value)+'</div><div class="stat-card__count">'+esc(foot)+'</div></div></div>';}
+  
   function renderOverview(){
     var now=new Date(), month=now.getMonth(),year=now.getFullYear();
     var valid=state.sales.filter(function(s){return s.status==='fechada';});
@@ -126,8 +201,8 @@
     var max=Math.max(1,...pipeline.map(function(s){return state.leads.filter(function(x){return x.status===s;}).length;}));
     var leadBar=pipeline.map(function(s){var count=state.leads.filter(function(x){return x.status===s;}).length;return '<div class="stage"><div class="stage-name">'+esc(statuses[s])+'</div><div class="stage-track"><div class="stage-fill" style="width:'+Math.round(count/max*100)+'%"></div></div><div class="stage-count">'+count+'</div></div>';}).join('');
     var sellers=state.consultants.map(function(c){var sales=valid.filter(function(v){return v.consultant_id===c.id;});return { name:c.name,total:sales.reduce(function(a,v){return a+Number(v.amount);},0),count:sales.length };}).sort(function(a,b){return b.total-a.total;});
-    return '<div class="stats">'+stat('Possíveis clientes',state.leads.length+'','No funil comercial')+stat('Vendas do mês',money(total),currentSales.length+' venda(s) fechada(s)')+stat('Reuniões futuras',upcoming.length+'','Compromissos agendados')+stat('Consultores ativos',state.consultants.filter(function(c){return c.active;}).length+'','Membros cadastrados')+'</div>'+
-      '<div class="split"><div class="card"><h2 class="card-title">Funil de oportunidades</h2>'+leadBar+'</div><div class="card"><h2 class="card-title">Próximas reuniões</h2>'+(upcoming.length?upcoming.slice(0,5).map(function(m){return '<div class="agenda-row"><div><strong>'+esc(m.title)+'</strong><small>'+esc(dateTime(m.starts_at))+' · '+esc(consultant(m.consultant_id))+'</small></div>'+chip(m.status)+'</div>';}).join(''):msgEmpty('Nenhuma reunião futura.'))+'</div></div>'+
+    return '<div class="stat-grid crm-stats">'+stat('Possíveis clientes',state.leads.length+'','No funil comercial')+stat('Vendas do mês',money(total),currentSales.length+' venda(s) fechada(s)')+stat('Reuniões futuras',upcoming.length+'','Compromissos agendados')+stat('Consultores ativos',state.consultants.filter(function(c){return c.active;}).length+'','Membros cadastrados')+'</div>'+
+      '<div class="crm-split"><div class="card"><h2 class="card-title">Funil de oportunidades</h2>'+leadBar+'</div><div class="card"><h2 class="card-title">Próximas reuniões</h2>'+(upcoming.length?upcoming.slice(0,5).map(function(m){return '<div class="agenda-row"><div><strong>'+esc(m.title)+'</strong><small>'+esc(dateTime(m.starts_at))+' · '+esc(consultant(m.consultant_id))+'</small></div>'+chip(m.status)+'</div>';}).join(''):msgEmpty('Nenhuma reunião futura.'))+'</div></div>'+
       '<div class="card" style="margin-top:18px"><h2 class="card-title">Resultados por consultor · histórico</h2>'+(sellers.length?sellers.map(function(c){return '<div class="person-row"><div><strong>'+esc(c.name)+'</strong><small>'+c.count+' venda(s) fechada(s)</small></div><span class="value">'+money(c.total)+'</span></div>';}).join(''):msgEmpty('Cadastre consultores e vendas para acompanhar resultados.'))+'</div>';
   }
   function renderLeads(){
@@ -147,17 +222,17 @@
   }
   function renderConsultants(){
     if(!state.consultants.length)return '<div class="card">'+msgEmpty('Nenhum consultor cadastrado. Adicione o primeiro para começar.')+'</div>';
-    return '<div class="cards3">'+state.consultants.map(function(c){var list=state.sales.filter(function(s){return s.consultant_id===c.id&&s.status==='fechada';});var total=list.reduce(function(a,s){return a+Number(s.amount);},0);return '<div class="consultant"><div class="consultant-top"><div class="consultant-icon">'+esc(c.name.slice(0,1).toUpperCase())+'</div><div style="flex:1;min-width:0"><strong>'+esc(c.name)+'</strong><small>'+esc(c.email||c.whatsapp||'Sem contato')+'</small></div>'+chip(c.active?'ativo':'inativo')+'</div><div class="consultant-stats"><div><strong>'+list.length+'</strong><small>Vendas</small></div><div><strong>'+money(total)+'</strong><small>Faturamento registrado</small></div></div><div style="margin-top:12px;text-align:right">'+btnEdit('consultants',c.id)+'</div></div>';}).join('')+'</div>';
+    return '<div class="crm-cards3">'+state.consultants.map(function(c){var list=state.sales.filter(function(s){return s.consultant_id===c.id&&s.status==='fechada';});var total=list.reduce(function(a,s){return a+Number(s.amount);},0);return '<div class="consultant"><div class="consultant-top"><div class="consultant-icon">'+esc(c.name.slice(0,1).toUpperCase())+'</div><div style="flex:1;min-width:0"><strong>'+esc(c.name)+'</strong><small>'+esc(c.email||c.whatsapp||'Sem contato')+'</small></div>'+chip(c.active?'ativo':'inativo')+'</div><div class="consultant-stats"><div><strong>'+list.length+'</strong><small>Vendas</small></div><div><strong>'+money(total)+'</strong><small>Faturamento registrado</small></div></div><div style="margin-top:12px;text-align:right">'+btnEdit('consultants',c.id)+'</div></div>';}).join('')+'</div>';
   }
   function render(){
     var info=pages[state.page];el('page-title').textContent=info[0];el('page-description').textContent=info[1];
-    el('new-button').textContent='+ '+info[2];
+    el('new-button').textContent='+ '+info[2];el('section-title').textContent=info[0];
     el('section-hint').textContent=state.page==='overview'?'Oportunidades e performance em um único lugar':{leads:state.leads.length+' lead(s) cadastrado(s)',sales:state.sales.length+' venda(s) registrada(s)',meetings:state.meetings.length+' reunião(ões) cadastrada(s)',consultants:state.consultants.length+' consultor(es) cadastrado(s)'}[state.page];
-    document.querySelectorAll('[data-page]').forEach(function(btn){btn.classList.toggle('active',btn.dataset.page===state.page);});
+    document.querySelectorAll('[data-page]').forEach(function(btn){btn.classList.toggle('is-active',btn.dataset.page===state.page);});
     el('workspace').innerHTML=state.page==='overview'?renderOverview():state.page==='leads'?renderLeads():state.page==='sales'?renderSales():state.page==='meetings'?renderMeetings():renderConsultants();
   }
   function showError(message){
-    el('boot').innerHTML='<div class="error-page"><h2>Não foi possível abrir a gestão</h2><p>'+esc(message)+'</p><a class="btn" href="../login.html">Ir para o login</a></div>';
+    el('boot').innerHTML='<div class="crm-error"><h2>Não foi possível abrir a gestão</h2><p>'+esc(message)+'</p><a class="btn btn-primary" href="../login.html">Ir para o login</a></div>';
     el('boot').hidden=false;el('shell').hidden=true;
   }
   function signin(){
@@ -232,11 +307,11 @@
     el('modal-title').textContent=(id?'Editar ':'Novo ')+singular;
     el('form-fields').innerHTML=definitions[type].map(function(f){return fieldHtml(f,record);}).join('');
     el('save-button').textContent=id?'Salvar alterações':'Cadastrar';
-    el('modal-overlay').classList.add('open');
+    el('modal-overlay').classList.add('is-open');
     var input=el('form-fields').querySelector('input:not([type=checkbox]),select');
     if(input)input.focus();
   }
-  function closeForm(){el('modal-overlay').classList.remove('open');state.editingId=null;state.formType=null;}
+  function closeForm(){el('modal-overlay').classList.remove('is-open');state.editingId=null;state.formType=null;}
   function toPayload(){
     var payload={company_id:state.companyId};
     definitions[state.formType].forEach(function(f){var key=f[0],type=f[2],input=el('f-'+key);var value=type==='checkbox'?input.checked:input.value.trim();
@@ -265,7 +340,13 @@
     finally{button.disabled=false;button.textContent='Salvar';}
   }
   function changePage(page){state.page=page;state.search='';state.status='';render();}
-  document.querySelectorAll('[data-page]').forEach(function(btn){btn.addEventListener('click',function(){changePage(btn.dataset.page);});});
+  document.querySelectorAll('[data-icon]').forEach(function(node){var icon=node.dataset.icon;node.innerHTML=SB_ICON[icon]||'';});
+  function closeSidebar(){el('sb-sidebar').classList.remove('is-open');el('sb-sidebar-overlay').style.display='none';document.body.style.overflow='';}
+  el('sb-menu-btn').addEventListener('click',function(){el('sb-sidebar').classList.add('is-open');el('sb-sidebar-overlay').style.display='block';document.body.style.overflow='hidden';});
+  el('sb-sidebar-close').addEventListener('click',closeSidebar);
+  el('sb-sidebar-overlay').addEventListener('click',closeSidebar);
+  el('crm-logout').addEventListener('click',async function(){await sb.auth.signOut();window.location.href='../login.html';});
+  document.querySelectorAll('[data-page]').forEach(function(btn){btn.addEventListener('click',function(){changePage(btn.dataset.page);closeSidebar();});});
   el('new-button').addEventListener('click',function(){openForm(state.page==='overview'?'leads':state.page);});
   el('workspace').addEventListener('click',function(e){var sell=e.target.closest('[data-sell]');if(sell){var l=find('leads',sell.dataset.sell);if(l)openForm('sales',null,{lead_id:l.id,consultant_id:l.consultant_id,customer_name:l.name,service:l.service,amount:l.estimated_value});return;}var btn=e.target.closest('[data-edit]');if(btn)openForm(btn.dataset.edit,btn.dataset.id);});
   el('workspace').addEventListener('input',function(e){
