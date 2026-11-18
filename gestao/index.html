@@ -101,6 +101,8 @@
   #note-timeline{max-height:320px;overflow:auto;margin:12px 0;border:1px solid var(--border-subtle);padding:12px;border-radius:var(--radius-md)}
   .crm-notes-btn{font-weight:700;color:var(--violet-600);white-space:nowrap}
   .crm-consultant-hint{font-size:11.5px;color:var(--text-muted);margin:12px 0}
+  .crm-lead-hint{grid-column:1/-1;color:var(--text-secondary);background:var(--bg-muted);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:13px 15px;font-size:12px;line-height:1.55}
+  .crm-optional-tag{color:var(--text-muted);font-weight:500;font-size:11px}
   @media(max-width:1100px){.crm-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.crm-cards3{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media(max-width:780px){.crm-split{grid-template-columns:1fr}.crm-cards3{grid-template-columns:1fr}.crm-module .meeting{gap:10px;padding:14px}}
   @media(max-width:640px){.crm-form-grid{grid-template-columns:1fr}.crm-form-grid .field.wide{grid-column:1}.crm-section-head{margin-bottom:var(--space-4)}#new-button{min-width:40px;padding:8px 10px;font-size:11.5px}.crm-module .toolbar{display:flex;flex-direction:column;align-items:stretch}.crm-module .filter{width:100%}.crm-module .meeting{flex-wrap:wrap}}
@@ -244,7 +246,7 @@
   function renderLeads(){
     var list=filtered(state.leads,function(r){return [r.name,r.company_name,r.service,r.email,r.whatsapp,consultant(r.consultant_id)].join(' ');});
     return sectionToolbar(['novo','contato','proposta','negociacao','ganho','perdido'])+
-      buildRows(list,[['Cliente',function(r){return '<strong>'+esc(r.name)+'</strong><small>'+esc(r.company_name||r.email||'')+'</small>';}],['Serviço',function(r){return '<strong>'+esc(r.service||'Não informado')+'</strong><small>'+esc(r.source||'Origem não informada')+'</small>';}],['Consultor',function(r){return esc(consultant(r.consultant_id));}],['Potencial',function(r){return money(r.estimated_value);}],['Status',function(r){return chip(r.status);}],['Próximo contato',function(r){return r.next_contact_at?esc(dateTime(r.next_contact_at)):'—';}],['Contato',function(r){return whatsapp(r.whatsapp);} ]]) +
+      buildRows(list,[['Cliente',function(r){var isBusiness=r.lead_kind==='pessoa_juridica'||(!r.lead_kind&&r.company_name);return '<strong>'+esc(r.name)+'</strong><small>'+esc(isBusiness?(r.company_name||'Empresa'):'Pessoa física')+(r.email?' · '+esc(r.email):'')+'</small>';}],['Serviço',function(r){return '<strong>'+esc(r.service||'Não informado')+'</strong><small>'+esc(r.source||'Origem não informada')+'</small>';}],['Consultor',function(r){return esc(consultant(r.consultant_id));}],['Potencial',function(r){return money(r.estimated_value);}],['Status',function(r){return chip(r.status);}],['Próximo contato',function(r){return r.next_contact_at?esc(dateTime(r.next_contact_at)):'—';}],['Contato',function(r){return whatsapp(r.whatsapp);} ]]) +
       '<p class="muted" style="font-size:11px;margin:12px 3px">Lead não é cliente de cobrança. Cadastros comerciais permanecem separados dos registros financeiros.</p>';
   }
   function renderSales(){
@@ -291,7 +293,7 @@
       ['name','Nome do consultor','text',true],['email','E-mail de acesso','email',true],['whatsapp','WhatsApp','tel'],['active','Consultor ativo','checkbox']
     ],
     leads:[
-      ['name','Nome do possível cliente','text',true],['company_name','Empresa','text'],['whatsapp','WhatsApp','tel'],['email','E-mail','email'],
+      ['name','Nome do possível cliente','text',true],['lead_kind','Tipo de cliente','leadKind'],['company_name','Nome da empresa','text'],['whatsapp','WhatsApp','tel'],['email','E-mail','email'],
       ['service','Serviço de interesse','text'],['source','Origem do contato','text'],
       ['estimated_value','Valor estimado (R$)','number'],['consultant_id','Consultor responsável','consultant'],
       ['status','Etapa do funil','leadStatus'],['next_contact_at','Próximo contato','datetime-local'],
@@ -315,13 +317,15 @@
     var key=field[0],label=field[1],type=field[2],required=!!field[3],value=record[key]??'';
     if(type==='datetime-local')value=localInput(value);
     if(key==='sold_at'&&!value)value=today();
+    if(key==='lead_kind'&&!value)value=record.company_name?'pessoa_juridica':'pessoa_fisica';
     if(key==='status'&&!value)value=state.formType==='leads'?'novo':state.formType==='sales'?'fechada':'agendada';
     if(key==='meeting_type'&&!value)value='online';
     if(key==='active'&&record.id==null)value=true;
-    var title='<label for="f-'+key+'">'+esc(label)+(required?' *':'')+'</label>';
+    var title='<label for="f-'+key+'">'+esc(label)+(required?' *':(state.formType==='leads'&&key!=='lead_kind'?'<span class="crm-optional-tag"> (opcional)</span>':''))+'</label>';
     if(type==='checkbox')return '<div class="field wide"><label style="display:flex;align-items:center;gap:10px"><input id="f-'+key+'" name="'+key+'" type="checkbox" '+(value?'checked':'')+'>'+esc(label)+'</label></div>';
     if(type==='textarea')return '<div class="field wide">'+title+'<textarea class="control" id="f-'+key+'" name="'+key+'">'+esc(value)+'</textarea></div>';
     var opts=null;
+    if(type==='leadKind')opts=[['pessoa_fisica','Pessoa física'],['pessoa_juridica','Empresa']];
     if(type==='consultant')opts=[['','Selecionar consultor']].concat(state.consultants.filter(function(c){return c.active||c.id===value;}).map(function(c){return [c.id,c.name];}));
     if(type==='lead')opts=[['','Sem vínculo']].concat(state.leads.map(function(l){return [l.id,l.name];}));
     if(type==='leadStatus')opts=['novo','contato','proposta','negociacao','ganho','perdido'].map(function(s){return [s,statuses[s]];});
@@ -338,12 +342,23 @@
     state.formType=type;state.editingId=id||null;
     var singular={leads:'lead',sales:'venda',meetings:'reunião',consultants:'consultor'}[type];
     el('modal-title').textContent=(id?'Editar ':'Novo ')+singular;
-    el('form-fields').innerHTML=definitions[type].map(function(f){return fieldHtml(f,record);}).join('');
+    el('form-fields').innerHTML=(type==='leads'?'<div class="crm-lead-hint"><strong>Cadastro rápido:</strong> apenas o nome é obrigatório. Você pode registrar uma pessoa física sem empresa, telefone ou e-mail e completar as informações depois.</div>':'')+definitions[type].map(function(f){return fieldHtml(f,record);}).join('');
+    if(type==='leads')updateLeadCompanyField();
     el('save-button').textContent=id?'Salvar alterações':'Cadastrar';
     el('modal-overlay').classList.add('is-open');
     var input=el('form-fields').querySelector('input:not([type=checkbox]),select');
     if(input)input.focus();
   }
+  function updateLeadCompanyField(){
+    var kind=el('f-lead_kind'),company=el('f-company_name');
+    if(!kind||!company)return;
+    var isBusiness=kind.value==='pessoa_juridica';
+    company.closest('.field').hidden=!isBusiness;
+    company.disabled=!isBusiness;
+  }
+  el('form-fields').addEventListener('change',function(event){
+    if(event.target.id==='f-lead_kind')updateLeadCompanyField();
+  });
   function closeForm(){el('modal-overlay').classList.remove('is-open');state.editingId=null;state.formType=null;}
   function toPayload(){
     var payload={company_id:state.companyId};
@@ -354,6 +369,7 @@
       if(value===''){payload[key]=null;return;}
       payload[key]=value;
     });
+    if(state.formType==='leads'&&payload.lead_kind==='pessoa_fisica')payload.company_name=null;
     if(state.role==='consultant'&&state.formType!=='consultants')payload.consultant_id=state.consultantId;
     return payload;
   }
