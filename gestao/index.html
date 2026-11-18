@@ -230,7 +230,15 @@
   function chip(status){var kind=({ganho:'paid',fechada:'paid',realizada:'paid',ativo:'paid',perdido:'overdue',cancelada:'overdue',inativo:'canceled',proposta:'pending',negociacao:'pending',agendada:'pending',novo:'review',contato:'review'})[status]||'canceled';return '<span class="badge badge-'+kind+'">'+esc(statuses[status]||status)+'</span>';}
   function phoneHref(phone){var digits=String(phone||'').replace(/\D/g,'');if(!digits)return '';return 'https://wa.me/'+(digits.length<=11?'55':'')+digits;}
   function whatsapp(phone){return phone ? '<a href="'+esc(phoneHref(phone))+'" target="_blank" rel="noopener noreferrer">WhatsApp</a>' : '—';}
-  function btnEdit(type,id){return '<button type="button" class="btn btn-sm tiny ghost" data-edit="'+esc(type)+'" data-id="'+esc(id)+'">Editar</button>';}
+  function btnEdit(type,id){
+    // Cada consultor pode consultar os dados da equipe e anotar qualquer lead,
+    // mas só pode editar registros sob sua responsabilidade.
+    if(state.role==='consultant'){
+      var record=find(type,id);
+      if(!record||record.consultant_id!==state.consultantId)return '';
+    }
+    return '<button type="button" class="btn btn-sm tiny ghost" data-edit="'+esc(type)+'" data-id="'+esc(id)+'">Editar</button>';
+  }
   function msgEmpty(text){return '<div class="empty">'+esc(text)+'</div>';}
   function rowActionButtons(r){
     var actions=btnEdit(state.page,r.id);
@@ -282,7 +290,7 @@
     var list=filtered(state.leads,function(r){return [r.name,r.company_name,r.service,r.email,r.whatsapp,consultant(r.consultant_id)].join(' ');});
     return sectionToolbar(['novo','contato','proposta','negociacao','ganho','perdido'])+
       buildRows(list,[['Cliente',function(r){var isBusiness=r.lead_kind==='pessoa_juridica'||(!r.lead_kind&&r.company_name);return '<strong>'+esc(r.name)+'</strong><small>'+esc(isBusiness?(r.company_name||'Empresa'):'Pessoa física')+(r.email?' · '+esc(r.email):'')+'</small>';}],['Serviço',function(r){return '<strong>'+esc(r.service||'Não informado')+'</strong><small>'+esc(r.source||'Origem não informada')+'</small>';}],['Consultor',function(r){return esc(consultant(r.consultant_id));}],['Potencial',function(r){return money(r.estimated_value);}],['Status',function(r){return chip(r.status);}],['Próximo contato',function(r){return r.next_contact_at?esc(dateTime(r.next_contact_at)):'—';}],['Contato',function(r){return whatsapp(r.whatsapp);} ]]) +
-      '<p class="muted" style="font-size:11px;margin:12px 3px">Lead não é cliente de cobrança. Cadastros comerciais permanecem separados dos registros financeiros.</p>';
+      '<p class="muted" style="font-size:11px;margin:12px 3px">Leads da equipe dev.abraao. Todos os consultores autorizados podem visualizar e registrar anotações. A edição dos dados permanece com o responsável ou administrador.</p>';
   }
   function renderSales(){
     var list=filtered(state.sales,function(r){return [r.customer_name,r.service,consultant(r.consultant_id)].join(' ');});
@@ -312,8 +320,14 @@
   async function load(){
     var kinds=['consultants','leads','sales','meetings','notes'];
     var results=await Promise.all(kinds.map(async function(k){
-      var query=sb.from(k==='notes'?'crm_lead_notes':tables[k]).select('*').eq('company_id',state.companyId);
-      var res=await query;
+      var res;
+      if(k==='consultants'&&state.role==='consultant'){
+        // Diretório com nomes da equipe, sem convites, e-mails ou dados de autenticação.
+        res=await sb.rpc('crm_team_directory',{p_company_id:state.companyId});
+      }else{
+        res=await sb.from(k==='notes'?'crm_lead_notes':tables[k])
+          .select('*').eq('company_id',state.companyId);
+      }
       if(res.error)throw new Error('Erro ao carregar '+k+': '+res.error.message);
       return res.data||[];
     }));
@@ -373,6 +387,7 @@
   function openForm(type,id,preset){
     if(type==='consultants'&&state.role!=='admin')return;
     var record=id?find(type,id):Object.assign({consultant_id:state.role==='consultant'?state.consultantId:null},preset||{});
+    if(id&&state.role==='consultant'&&record&&record.consultant_id!==state.consultantId)return;
     if(!record)return;
     state.formType=type;state.editingId=id||null;
     var singular={leads:'lead',sales:'venda',meetings:'reunião',consultants:'consultor'}[type];
