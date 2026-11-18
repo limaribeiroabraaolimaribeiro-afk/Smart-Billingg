@@ -66,6 +66,18 @@
   .crm-module .table-wrap td strong{font-size:13px}
   .crm-module .table-wrap td small{font-size:11.5px;color:var(--text-muted);display:block;margin-top:4px}
   .crm-module .table-wrap td a{font-weight:700;color:var(--blue-600)}
+  .crm-module .crm-row-actions{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+  .crm-module .card-list{width:100%;min-width:0}
+  .crm-module .data-card{box-shadow:var(--shadow-sm)}
+  .crm-module .crm-card-primary{min-width:0;flex:1;overflow-wrap:anywhere}
+  .crm-module .crm-card-primary strong{display:block;font-size:14px;color:var(--text-primary)}
+  .crm-module .crm-card-primary small{display:block;font-size:11.5px;color:var(--text-muted);margin-top:4px}
+  .crm-module .data-card__row{gap:var(--space-3);align-items:flex-start}
+  .crm-module .crm-mobile-value{max-width:65%;min-width:0;text-align:right;font-size:12.5px;font-weight:700;overflow-wrap:anywhere}
+  .crm-module .crm-mobile-value small{display:block;color:var(--text-muted);font-size:11px;font-weight:500}
+  .crm-module .data-card__top .badge{flex-shrink:0}
+  .crm-module .data-card__actions{flex-wrap:wrap}
+  .crm-module .data-card__actions .btn{flex:1;white-space:normal}
   .crm-module .btn.tiny{font-size:12px;min-height:34px;padding:6px 10px}
   .crm-module .btn.ghost{color:var(--violet-600);background:transparent}
   .crm-module .btn.ghost:hover{background:var(--gradient-brand-soft)}
@@ -220,8 +232,31 @@
   function whatsapp(phone){return phone ? '<a href="'+esc(phoneHref(phone))+'" target="_blank" rel="noopener noreferrer">WhatsApp</a>' : '—';}
   function btnEdit(type,id){return '<button type="button" class="btn btn-sm tiny ghost" data-edit="'+esc(type)+'" data-id="'+esc(id)+'">Editar</button>';}
   function msgEmpty(text){return '<div class="empty">'+esc(text)+'</div>';}
-  function buildRows(rows,fields){if(!rows.length)return '<div class="card">'+msgEmpty('Nenhum registro encontrado. Cadastre o primeiro para começar.')+'</div>';
-    return '<div class="table-wrap"><table><thead><tr>'+fields.map(function(f){return '<th>'+f[0]+'</th>';}).join('')+'<th>Ações</th></tr></thead><tbody>'+rows.map(function(r){return '<tr>'+fields.map(function(f){return '<td>'+f[1](r)+'</td>';}).join('')+'<td>'+btnEdit(state.page,r.id)+(state.page==='leads'?'<button type="button" class="btn btn-sm tiny ghost" data-sell="'+esc(r.id)+'">Registrar venda</button> <button type="button" class="btn btn-sm tiny ghost" data-note="'+esc(r.id)+'">Anotações ('+state.notes.filter(function(n){return n.lead_id===r.id;}).length+')</button>':'')+'</td></tr>';}).join('')+'</tbody></table></div>';
+  function rowActionButtons(r){
+    var actions=btnEdit(state.page,r.id);
+    if(state.page==='leads'){
+      var noteCount=state.notes.filter(function(n){return n.lead_id===r.id;}).length;
+      actions+='<button type="button" class="btn btn-sm tiny ghost" data-sell="'+esc(r.id)+'">Registrar venda</button>';
+      actions+='<button type="button" class="btn btn-sm tiny ghost" data-note="'+esc(r.id)+'">Anotações ('+noteCount+')</button>';
+    }
+    return actions;
+  }
+  function buildRows(rows,fields){
+    if(!rows.length)return '<div class="card">'+msgEmpty('Nenhum registro encontrado. Cadastre o primeiro para começar.')+'</div>';
+    // As tabelas originais são ocultadas no mobile pelo components.css.
+    // Renderizamos também os cartões nativos data-card/card-list, que aparecem abaixo de 860 px.
+    var desktop='<div class="table-wrap"><table><thead><tr>'+fields.map(function(f){return '<th>'+f[0]+'</th>';}).join('')+'<th>Ações</th></tr></thead><tbody>'+rows.map(function(r){
+      return '<tr>'+fields.map(function(f){return '<td>'+f[1](r)+'</td>';}).join('')+'<td><div class="crm-row-actions">'+rowActionButtons(r)+'</div></td></tr>';
+    }).join('')+'</tbody></table></div>';
+    var cards='<div class="card-list" aria-label="Registros cadastrados">'+rows.map(function(r){
+      var status=r.status?chip(r.status):'';
+      var details=fields.slice(1).filter(function(f){return f[0]!=='Status';}).map(function(f){
+        return '<div class="data-card__row"><span class="label">'+esc(f[0])+'</span><span class="value crm-mobile-value">'+f[1](r)+'</span></div>';
+      }).join('');
+      return '<article class="data-card"><div class="data-card__top"><div class="crm-card-primary">'+fields[0][1](r)+'</div>'+status+'</div>'+
+        details+'<div class="data-card__actions crm-row-actions">'+rowActionButtons(r)+'</div></article>';
+    }).join('')+'</div>';
+    return desktop+cards;
   }
   function sectionToolbar(types){
     return '<div class="toolbar"><input class="search" id="record-search" autocomplete="off" placeholder="Buscar por nome, serviço ou consultor..." value="'+esc(state.search)+'"><select class="filter" id="record-filter"><option value="">Todos os status</option>'+types.map(function(s){return '<option value="'+s+'" '+(state.status===s?'selected':'')+'>'+esc(statuses[s])+'</option>';}).join('')+'</select></div>';
