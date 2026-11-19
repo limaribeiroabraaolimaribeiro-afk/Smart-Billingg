@@ -189,6 +189,36 @@
   .crm-agenda-actions .btn-primary{justify-content:center}
   .crm-report-pending{font-size:11.5px;color:var(--text-muted);margin-top:12px}
   @media(max-width:500px){.crm-agenda-card{padding:15px}.crm-agenda-head{gap:10px}.crm-agenda-date{width:47px;height:52px}.crm-agenda-actions .btn-primary{flex:1 1 150px}}
+
+  .crm-lead-list{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .crm-lead-card{min-width:0;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:16px;box-shadow:var(--shadow-sm);padding:17px 16px;overflow:hidden}
+  .crm-lead-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+  .crm-lead-identity{flex:1;min-width:0}
+  .crm-lead-identity h3{margin:0;font-size:16px;line-height:1.25;color:var(--text-primary);font-weight:800;overflow-wrap:anywhere;letter-spacing:-.35px}
+  .crm-lead-identity p{margin:4px 0 0;font-size:12px;color:var(--text-muted);overflow-wrap:anywhere;line-height:1.45}
+  .crm-lead-head .badge{flex-shrink:0;white-space:nowrap}
+  .crm-lead-service-block{margin-top:14px;border-radius:11px;padding:12px 13px;background:var(--bg-muted);border:1px solid var(--border-subtle);min-width:0}
+  .crm-lead-caption{display:block;font-size:10px;font-weight:800;line-height:1.3;text-transform:uppercase;letter-spacing:.045em;color:var(--text-muted);margin-bottom:5px}
+  .crm-lead-service-text{font-size:13.5px;font-weight:750;line-height:1.45;color:var(--text-primary);overflow-wrap:anywhere;white-space:normal}
+  .crm-lead-stats{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:14px}
+  .crm-lead-stat{min-width:0}
+  .crm-lead-stat strong{font-size:12.5px;line-height:1.45;font-weight:750;color:var(--text-primary);display:block;overflow-wrap:anywhere}
+  .crm-lead-next{margin-top:12px;color:var(--text-secondary);font-size:11.5px;line-height:1.4}
+  .crm-lead-next strong{font-weight:700;color:var(--text-primary)}
+  .crm-lead-extra{margin-top:12px;border-top:1px solid var(--border-subtle)}
+  .crm-lead-extra summary{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:12px 0 0;list-style:none;cursor:pointer;font-size:11.5px;color:var(--violet-600);font-weight:750}
+  .crm-lead-extra summary::-webkit-details-marker{display:none}
+  .crm-lead-extra summary::after{content:"⌄";font-size:17px;line-height:1}
+  .crm-lead-extra[open] summary::after{content:"⌃"}
+  .crm-lead-extra-body{padding-top:10px;font-size:12px;color:var(--text-secondary);overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.55}
+  .crm-lead-extra-body>div+div{margin-top:9px}
+  .crm-lead-extra-body b{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;color:var(--text-muted)}
+  .crm-lead-actions{margin-top:14px;padding-top:12px;border-top:1px solid var(--border-subtle);display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+  .crm-lead-actions .btn{flex:1 1 auto;min-height:37px;font-size:11.5px;font-weight:750;white-space:normal;padding:8px 10px;border-radius:9px}
+  .crm-lead-actions .btn-secondary{border:1px solid var(--border-subtle);color:var(--text-primary);background:var(--bg-surface)}
+  .crm-lead-actions .btn-note{background:var(--gradient-brand-soft);color:var(--violet-600);border:1px solid transparent}
+  .crm-lead-actions a.btn{display:inline-flex;justify-content:center;align-items:center;text-decoration:none}
+  @media(max-width:380px){.crm-lead-card{padding:14px}.crm-lead-actions .btn{flex:1 1 calc(50% - 7px)}}
 </style>
 </head>
 <body>
@@ -305,7 +335,7 @@
 (function () {
   'use strict';
   var sb = typeof SB_SUPABASE !== 'undefined' ? SB_SUPABASE.client : null;
-  var state = { page: 'overview', companyId: null, user: null, role: 'admin', consultantId: null, noteLeadId: null, reportMeetingId: null, search: '', status: '', editingId: null, formType: null, leads: [], sales: [], meetings: [], consultants: [], notes: [], noteDetails: [] };
+  var state = { page: 'overview', companyId: null, user: null, role: 'admin', consultantId: null, noteLeadId: null, reportMeetingId: null, search: '', status: '', editingId: null, formType: null, leads: [], sales: [], meetings: [], consultants: [], notes: [], noteDetails: [], noteCounts: Object.create(null) };
   var pages = {
     overview: ['Visão geral', 'Acompanhe o funil, os resultados e as próximas reuniões.', 'Novo lead'],
     leads: ['Possíveis clientes', 'Cadastre oportunidades, acompanhe negociações e organize contatos.', 'Novo lead'],
@@ -342,7 +372,7 @@
   function rowActionButtons(r){
     var actions=btnEdit(state.page,r.id);
     if(state.page==='leads'){
-      var noteCount=state.notes.filter(function(n){return n.lead_id===r.id;}).length;
+      var noteCount=state.noteCounts[r.id]||0;
       actions+='<button type="button" class="btn btn-sm tiny ghost" data-sell="'+esc(r.id)+'">Registrar venda</button>';
       actions+='<button type="button" class="btn btn-sm tiny ghost" data-note="'+esc(r.id)+'">Anotações ('+noteCount+')</button>';
     }
@@ -363,8 +393,9 @@
       return '<article class="data-card"><div class="data-card__top"><div class="crm-card-primary">'+fields[0][1](r)+'</div>'+status+'</div>'+
         details+'<div class="data-card__actions crm-row-actions">'+rowActionButtons(r)+'</div></article>';
     }).join('')+'</div>';
-    return desktop+cards;
+    return isMobileCards()?cards:desktop;
   }
+  function isMobileCards(){return window.matchMedia('(max-width: 860px)').matches;}
   function sectionToolbar(types){
     return '<div class="toolbar"><input class="search" id="record-search" autocomplete="off" placeholder="Buscar por nome, serviço ou consultor..." value="'+esc(state.search)+'"><select class="filter" id="record-filter"><option value="">Todos os status</option>'+types.map(function(s){return '<option value="'+s+'" '+(state.status===s?'selected':'')+'>'+esc(statuses[s])+'</option>';}).join('')+'</select></div>';
   }
@@ -385,9 +416,49 @@
       '<div class="crm-split"><div class="card"><h2 class="card-title">Funil de oportunidades</h2>'+leadBar+'</div><div class="card"><h2 class="card-title">Próximas reuniões</h2>'+(upcoming.length?upcoming.slice(0,5).map(function(m){return '<div class="agenda-row"><div><strong>'+esc(m.title)+'</strong><small>'+esc(dateTime(m.starts_at))+' · '+esc(consultant(m.consultant_id))+'</small></div>'+chip(m.status)+'</div>';}).join(''):msgEmpty('Nenhuma reunião futura.'))+'</div></div>'+
       '<div class="card" style="margin-top:18px"><h2 class="card-title">Resultados por consultor · histórico</h2>'+(sellers.length?sellers.map(function(c){return '<div class="person-row"><div><strong>'+esc(c.name)+'</strong><small>'+c.count+' venda(s) fechada(s)</small></div><span class="value">'+money(c.total)+'</span></div>';}).join(''):msgEmpty('Cadastre consultores e vendas para acompanhar resultados.'))+'</div>';
   }
+  function renderLeadMobileCard(r){
+    var business=r.lead_kind==='pessoa_juridica'||(!r.lead_kind&&r.company_name);
+    var count=state.noteCounts[r.id]||0;
+    var extra=[];
+    if(r.source)extra.push('<div><b>Origem / indicação</b>'+esc(r.source)+'</div>');
+    if(r.email)extra.push('<div><b>E-mail</b>'+esc(r.email)+'</div>');
+    var note='<button type="button" class="btn btn-note" data-note="'+esc(r.id)+'">Anotações'+(count?' ('+count+')':'')+'</button>';
+    var edit=btnEdit('leads',r.id);
+    if(edit)edit=edit.replace('class="btn btn-sm tiny ghost"','class="btn btn-secondary"');
+    var sale='<button type="button" class="btn btn-secondary" data-sell="'+esc(r.id)+'">Registrar venda</button>';
+    var wa=r.whatsapp?'<a class="btn btn-secondary" target="_blank" rel="noopener noreferrer" href="'+esc(phoneHref(r.whatsapp))+'">WhatsApp</a>':'';
+    return '<article class="crm-lead-card">'+
+      '<header class="crm-lead-head"><div class="crm-lead-identity"><h3>'+esc(r.name)+'</h3>'+
+        '<p>'+esc(business?(r.company_name||'Empresa'):'Pessoa física')+'</p></div>'+chip(r.status)+'</header>'+
+      '<section class="crm-lead-service-block"><span class="crm-lead-caption">Serviço de interesse</span>'+
+        '<div class="crm-lead-service-text">'+esc(r.service||'Serviço a definir')+'</div></section>'+
+      '<div class="crm-lead-stats">'+
+        '<div class="crm-lead-stat"><span class="crm-lead-caption">Responsável</span><strong>'+esc(consultant(r.consultant_id))+'</strong></div>'+
+        '<div class="crm-lead-stat"><span class="crm-lead-caption">Valor estimado</span><strong>'+esc(money(r.estimated_value))+'</strong></div>'+
+      '</div>'+
+      (r.next_contact_at?'<div class="crm-lead-next">Próximo contato: <strong>'+esc(dateTime(r.next_contact_at))+'</strong></div>':'')+
+      (extra.length?'<details class="crm-lead-extra"><summary>Informações adicionais</summary>'+
+        '<div class="crm-lead-extra-body">'+extra.join('')+'</div></details>':'')+
+      '<footer class="crm-lead-actions">'+note+sale+edit+wa+'</footer></article>';
+  }
   function renderLeadRecords(){
-    var list=filtered(state.leads,function(r){return [r.name,r.company_name,r.service,r.email,r.whatsapp,consultant(r.consultant_id)].join(' ');});
-    return buildRows(list,[['Cliente',function(r){var isBusiness=r.lead_kind==='pessoa_juridica'||(!r.lead_kind&&r.company_name);return '<strong>'+esc(r.name)+'</strong><small>'+esc(isBusiness?(r.company_name||'Empresa'):'Pessoa física')+(r.email?' · '+esc(r.email):'')+'</small>';}],['Serviço',function(r){return '<strong>'+esc(r.service||'Não informado')+'</strong><small>'+esc(r.source||'Origem não informada')+'</small>';}],['Consultor',function(r){return esc(consultant(r.consultant_id));}],['Potencial',function(r){return money(r.estimated_value);}],['Status',function(r){return chip(r.status);}],['Próximo contato',function(r){return r.next_contact_at?esc(dateTime(r.next_contact_at)):'—';}],['Contato',function(r){return whatsapp(r.whatsapp);} ]]);
+    var list=filtered(state.leads,function(r){
+      return [r.name,r.company_name,r.service,r.source,r.email,r.whatsapp,consultant(r.consultant_id)].join(' ');
+    });
+    if(isMobileCards()){
+      if(!list.length)return '<div class="card">'+msgEmpty('Nenhum cliente encontrado.')+'</div>';
+      return '<div class="crm-lead-list">'+list.map(renderLeadMobileCard).join('')+'</div>';
+    }
+    return buildRows(list,[
+      ['Cliente',function(r){var isBusiness=r.lead_kind==='pessoa_juridica'||(!r.lead_kind&&r.company_name);
+        return '<strong>'+esc(r.name)+'</strong><small>'+esc(isBusiness?(r.company_name||'Empresa'):'Pessoa física')+(r.email?' · '+esc(r.email):'')+'</small>';}],
+      ['Serviço',function(r){return '<strong>'+esc(r.service||'Não informado')+'</strong><small>'+esc(r.source||'Origem não informada')+'</small>';}],
+      ['Consultor',function(r){return esc(consultant(r.consultant_id));}],
+      ['Potencial',function(r){return money(r.estimated_value);}],
+      ['Status',function(r){return chip(r.status);}],
+      ['Próximo contato',function(r){return r.next_contact_at?esc(dateTime(r.next_contact_at)):'—';}],
+      ['Contato',function(r){return whatsapp(r.whatsapp);}]
+    ]);
   }
   function renderLeads(){
     return sectionToolbar(['novo','contato','proposta','negociacao','ganho','perdido'])+'<div id="crm-records">'+renderLeadRecords()+'</div>'+'<p class="muted" style="font-size:11px;margin:12px 3px">Leads da equipe dev.abraao. Todos os consultores autorizados podem visualizar e registrar anotações. A edição dos dados permanece com o responsável ou administrador.</p>';
@@ -479,7 +550,13 @@
       if(res.error)throw new Error('Erro ao carregar '+k+': '+res.error.message);
       return res.data||[];
     }));
-    kinds.forEach(function(k,i){state[k]=results[i];});
+    kinds.forEach(function(k,i){
+      state[k]=results[i];
+      if(k==='notes'){
+        state.noteCounts=Object.create(null);
+        state.notes.forEach(function(n){state.noteCounts[n.lead_id]=(state.noteCounts[n.lead_id]||0)+1;});
+      }
+    });
     state.consultants.sort(function(a,b){return a.name.localeCompare(b.name,'pt-BR');});
     state.sales.sort(function(a,b){return b.sold_at.localeCompare(a.sold_at);});
     state.leads.sort(function(a,b){return b.created_at.localeCompare(a.created_at);});
@@ -626,6 +703,12 @@
       state.page==='meetings'?renderMeetingList():null;
     if(markup!==null)target.innerHTML=markup;
   }
+  var crmResponsiveMedia=window.matchMedia('(max-width: 860px)');
+  if(crmResponsiveMedia.addEventListener){
+    crmResponsiveMedia.addEventListener('change',function(){
+      if(state.page==='leads'||state.page==='sales')refreshFilteredRecords();
+    });
+  }
   el('workspace').addEventListener('input',function(e){
     if(e.target.id!=='record-search')return;
     state.search=e.target.value;
@@ -767,6 +850,7 @@
       }).select('*').single();
       if(res.error)throw res.error;
       state.notes.push({id:res.data.id,lead_id:res.data.lead_id});
+      state.noteCounts[res.data.lead_id]=(state.noteCounts[res.data.lead_id]||0)+1;
       state.noteDetails.push(res.data);
       el('note-body').value='';
       renderNotes();
