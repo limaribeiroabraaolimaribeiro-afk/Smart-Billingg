@@ -163,31 +163,80 @@
       <div class="card-list">${rows.map(cardHtml).join('')}</div>`;
   }
 
-  async function refresh() {
-    const [summary, recent] = await Promise.all([
-      DB.dashboard.summary(),
-      DB.dashboard.recent(10),
-    ]);
-    allRecent = recent;
-    renderStatCards(summary);
-    renderTable();
+  const statGrid = document.getElementById('stat-grid');
+  const loadStatus = document.getElementById('dash-load-status');
+  const loadText = document.getElementById('dash-load-text');
+  let refreshVersion = 0;
+
+  // A rede móvel pode demorar ou ficar sem resposta. Não deixe skeletons
+  // presos indefinidamente: após o limite, ofereça nova tentativa.
+  function withTimeout(promise, milliseconds = 15000) {
+    let timeoutId;
+    const timeout = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('Tempo limite de carregamento excedido.')), milliseconds);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
   }
 
-  try {
-    await refresh();
-  } catch (err) {
-    console.error('[Smart Billing] dashboard: falha ao carregar —', err?.message || err, err?.stack);
-    document.getElementById('stat-grid').innerHTML = '';
-    tableRegion.innerHTML = `
-      <div class="state-block is-error">
-        <div class="state-block__icon">${SB_ICON.alertCircle}</div>
-        <div class="state-block__title">Não foi possível carregar o dashboard</div>
-        <p class="state-block__desc">Ocorreu um erro ao buscar os dados. Tente novamente.</p>
-        <button class="btn btn-secondary btn-sm" onclick="location.reload()">Tentar novamente</button>
-      </div>`;
-  } finally {
-    // Rede de segurança: garante que nenhum skeleton fique preso na tela,
-    // mesmo que refresh() tenha falhado parcialmente antes de renderizar.
-    document.querySelectorAll('.skeleton').forEach((el) => el.remove());
+  function showLoadError(target, title) {
+    target.innerHTML =
+      '<div class="state-block is-error">' +
+        '<div class="state-block__icon">' + SB_ICON.alertCircle + '</div>' +
+        '<div class="state-block__title">' + title + '</div>' +
+        '<p class="state-block__desc">Confira sua conexão e tente carregar novamente.</p>' +
+        '<button type="button" class="btn btn-secondary btn-sm" data-dashboard-retry>Tentar novamente</button>' +
+      '</div>';
+    target.querySelector('[data-dashboard-retry]')?.addEventListener('click', refresh);
   }
+
+  async function refresh() {
+    const version = ++refreshVersion;
+    loadStatus?.classList.remove('is-complete', 'is-error');
+    if (loadText) loadText.textContent = 'Atualizando informações...';
+    statGrid.setAttribute('aria-busy', 'true');
+    tableRegion.setAttribute('aria-busy', 'true');
+
+    // Cada seção aparece assim que seu próprio pedido termina. Erro nas
+    // cobranças recentes não impede os indicadores de serem apresentados.
+    const summaryTask = withTimeout(DB.dashboard.summary())
+      .then((summary) => {
+        if (version !== refreshVersion) return false;
+        renderStatCards(summary);
+        return true;
+      })
+      .catch((err) => {
+        console.error('[Smart Billing] Falha nos indicadores:', err);
+        if (version !== refreshVersion) return false;
+        showLoadError(statGrid, 'Não foi possível carregar os indicadores');
+        return false;
+      })
+      .finally(() => {
+        if (version === refreshVersion) statGrid.setAttribute('aria-busy', 'false');
+      });
+
+    const recentTask = withTimeout(DB.dashboard.recent(10))
+      .then((recent) => {
+        if (version !== refreshVersion) return false;
+        allRecent = recent;
+        renderTable();
+        return true;
+      })
+      .catch((err) => {
+        console.error('[Smart Billing] Falha nas cobranças recentes:', err);
+        if (version !== refreshVersion) return false;
+        showLoadError(tableRegion, 'Não foi possível carregar as cobranças');
+        return false;
+      })
+      .finally(() => {
+        if (version === refreshVersion) tableRegion.setAttribute('aria-busy', 'false');
+      });
+
+    const results = await Promise.all([summaryTask, recentTask]);
+    if (version !== refreshVersion) return;
+    const complete = results.every(Boolean);
+    loadStatus?.classList.add(complete ? 'is-complete' : 'is-error');
+    if (loadText) loadText.textContent = complete ? 'Dados atualizados' : 'Alguns dados não carregaram';
+  }
+
+  await refresh();
 })();
