@@ -1252,6 +1252,18 @@ const DB = (() => {
         const data = unwrap(await client.from('charges').select(CHARGE_SELECT).eq('company_id', companyId).order('created_at', { ascending: false }).limit(limit));
         return data.map(mapCharge);
       },
+      // Busca apenas o mês anterior, em segundo plano; não atrasa os cinco
+      // indicadores agregados. Mantém a variação mensal do cartão recebido.
+      async previousMonthPaid() {
+        const companyId = await getCompanyId();
+        const now = new Date();
+        const previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+        const currentStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const rows = unwrap(await client.from('charges').select('amount')
+          .eq('company_id', companyId).eq('status', 'paid')
+          .gte('paid_at', previousStart).lt('paid_at', currentStart));
+        return rows.reduce((total, row) => total + Number(row.amount || 0), 0);
+      },
     };
 
     // ---------------- empresa ----------------
