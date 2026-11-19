@@ -232,6 +232,21 @@
       .then((summary) => {
         if (version !== refreshVersion) return false;
         renderStatCards(summary);
+        // O comparativo é opcional e chega depois dos valores principais.
+        if (summary.totalRecebido?.variacao == null && typeof DB.dashboard.previousMonthPaid === 'function') {
+          withTimeout(DB.dashboard.previousMonthPaid(), 10000).then((previous) => {
+            if (version !== refreshVersion || previous <= 0) return;
+            const change = ((summary.totalRecebido.valor - previous) / previous) * 100;
+            const top = statGrid.querySelector('.stat-card:first-child .stat-card__top');
+            if (!top) return;
+            const badge = document.createElement('span');
+            badge.className = 'stat-card__trend ' + (change >= 0 ? 'is-up' : 'is-down');
+            badge.innerHTML = (change >= 0 ? SB_ICON.trendUp : SB_ICON.trendDown) + Math.abs(change).toFixed(1) + '%';
+            top.appendChild(badge);
+            const count = statGrid.querySelector('.stat-card:first-child .stat-card__count');
+            if (count) count.textContent += ' · vs. mês anterior';
+          }).catch((err) => console.warn('[Smart Billing] Comparativo mensal indisponível:', err.message));
+        }
         return true;
       })
       .catch((err) => {
