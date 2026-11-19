@@ -3,7 +3,37 @@
    ========================================================================== */
 
 (async function initDashboard() {
-  const session = await SB_AUTH.requireSession();
+  let session;
+  let sessionTimeout;
+  try {
+    session = await Promise.race([
+      SB_AUTH.requireSession(),
+      new Promise((_, reject) => {
+        sessionTimeout = setTimeout(() => reject(new Error('A verificação da sessão demorou mais que o esperado.')), 15000);
+      }),
+    ]);
+  } catch (err) {
+    console.error('[Smart Billing] Falha ao verificar a sessão:', err);
+    const grid = document.getElementById('stat-grid');
+    const status = document.getElementById('dash-load-status');
+    const message = document.getElementById('dash-load-text');
+    if (status) status.classList.add('is-error');
+    if (message) message.textContent = 'Não foi possível iniciar o painel';
+    if (grid) {
+      grid.setAttribute('aria-busy', 'false');
+      grid.innerHTML =
+        '<div class="state-block is-error">' +
+          '<div class="state-block__title">Falha na conexão</div>' +
+          '<p class="state-block__desc">Não foi possível verificar sua sessão. Confira a internet e tente novamente.</p>' +
+          '<button type="button" class="btn btn-secondary btn-sm" id="dash-reload-session">Recarregar painel</button>' +
+        '</div>';
+      document.getElementById('dash-reload-session')?.addEventListener('click', () => location.reload());
+    }
+    document.getElementById('dash-table-region')?.replaceChildren();
+    return;
+  } finally {
+    clearTimeout(sessionTimeout);
+  }
   if (!session) return;
 
   await SBLayout.mount({
