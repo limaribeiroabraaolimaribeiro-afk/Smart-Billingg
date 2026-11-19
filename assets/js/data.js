@@ -801,12 +801,19 @@ const DB = (() => {
     }
 
     let cachedCompanyId = null;
+    let companyIdRequest = null;
     async function getCompanyId() {
       if (cachedCompanyId) return cachedCompanyId;
-      const data = unwrap(await client.rpc('my_default_company_id'));
-      if (!data) throw new Error('Nenhuma empresa encontrada para este usuário.');
-      cachedCompanyId = data;
-      return cachedCompanyId;
+      // Reutiliza a mesma chamada para indicadores, cobranças e perfil.
+      if (!companyIdRequest) {
+        companyIdRequest = (async () => {
+          const id = unwrap(await client.rpc('my_default_company_id'));
+          if (!id) throw new Error('Nenhuma empresa encontrada para este usuário.');
+          cachedCompanyId = id;
+          return id;
+        })().finally(() => { companyIdRequest = null; });
+      }
+      return companyIdRequest;
     }
 
     let cachedUserId = null;
@@ -1216,14 +1223,29 @@ const DB = (() => {
     const dashboard = {
       async summary() {
         const companyId = await getCompanyId();
-        const data = unwrap(await client.from('charges').select('amount, status, due_date, paid_at').eq('company_id', companyId));
-        const mapped = data.map((row) => ({
+        // View security_invoker existente no banco: agrega no Postgres,
+        // evitando transferir toda a tabela charges a cada visita ao painel.
+        const result = await client.from('v_dashboard_summary').select('*').eq('company_id', companyId).maybeSingle();
+        if (!result.error && result.data) {
+          const v = result.data;
+          const num = (key) => Number(v[key] || 0);
+          return {
+            totalRecebido: { valor: num('total_received_month'), quantidade: num('qty_received_month'), variacao: null },
+            pendentes: { valor: num('total_pending'), quantidade: num('qty_pending') },
+            pagasHoje: { valor: num('total_paid_today'), quantidade: num('qty_paid_today') },
+            vencendo: { valor: num('total_due_soon'), quantidade: num('qty_due_soon') },
+            atrasadas: { valor: num('total_overdue'), quantidade: num('qty_overdue') },
+          };
+        }
+        // Compatibilidade com instalações sem a view: preserva consulta antiga.
+        if (result.error) console.warn('[Smart Billing] View de indicadores indisponível, usando consulta alternativa:', result.error.message);
+        const rows = unwrap(await client.from('charges').select('amount, status, due_date, paid_at').eq('company_id', companyId));
+        return aggregateDashboard(rows.map((row) => ({
           valor: Number(row.amount),
           status: statusFromDb(row),
           vencimento: `${row.due_date}T12:00:00`,
           pagoEm: row.paid_at,
-        }));
-        return aggregateDashboard(mapped);
+        })));
       },
       async recent(limit = 8) {
         const companyId = await getCompanyId();
